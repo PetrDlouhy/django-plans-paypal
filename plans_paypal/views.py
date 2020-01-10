@@ -15,7 +15,7 @@ def view_that_asks_for_money(request, order_id):
     paypal_dict = {
         "cmd": "_xclick-subscriptions",
         "business": settings.PAYPAL_BUSSINESS_EMAIL,
-        "a3": order.total(),                      # monthly price
+        "a3": str(order.total()),                      # monthly price
         "p3": order.pricing.period,                           # duration of each unit (depends on unit)
         "t3": "D",                         # duration unit ("M for Month")
         "src": "1",                        # make payments recur
