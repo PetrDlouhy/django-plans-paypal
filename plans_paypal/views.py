@@ -11,7 +11,6 @@ def view_that_asks_for_money(request, order_id):
     order = get_object_or_404(Order, pk=order_id)
 
     # What you want the button to do.
-    # import pudb; pudb.set_trace()
     paypal_dict = {
         "cmd": "_xclick-subscriptions",
         "business": settings.PAYPAL_BUSSINESS_EMAIL,
