@@ -34,6 +34,7 @@ def show_me_the_money(sender, **kwargs):
         order = Order.objects.get(pk=custom['first_order_id'])
         if order.status == 2:
             order = Order.objects.create(user=user_plan.user, plan=user_plan.plan, pricing=pricing, amount=ipn_obj.mc_gross, currency=ipn_obj.mc_currency)
+        user_plan.set_plan_renewal(order, has_automatic_renewal=True, token_verified=True)
         order.complete_order()
 
 
