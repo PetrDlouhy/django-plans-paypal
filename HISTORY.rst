@@ -3,6 +3,10 @@
 History
 -------
 
+0.2.1 (2021-10-12)
+++++++++++++++++++
+add sandbox view to be to switch on one server
+
 0.2.0 (2021-10-11)
 ++++++++++++++++++
 * fix periods to complain with PayPal maximal durations
