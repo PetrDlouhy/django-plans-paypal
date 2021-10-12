@@ -7,7 +7,19 @@ from paypal.standard.forms import PayPalPaymentsForm
 from plans.models import Order
 
 
-def view_that_asks_for_money(request, order_id):
+class PlansPayPalPaymentsForm(PayPalPaymentsForm):
+    def __init__(self, test_mode_enabled=False, *args, **kwargs):
+        self.test_mode_enabled = test_mode_enabled
+        super().__init__(*args, **kwargs)
+
+    def test_mode(self):
+        if self.test_mode_enabled:
+            return True
+        import pudb; pudb.set_trace()
+        return super().test_mode()
+
+
+def view_that_asks_for_money(request, order_id, sandbox=False):
     order = get_object_or_404(Order, pk=order_id)
 
     period = order.pricing.period
@@ -29,7 +41,7 @@ def view_that_asks_for_money(request, order_id):
     # What you want the button to do.
     paypal_dict = {
         "cmd": "_xclick-subscriptions",
-        "business": settings.PAYPAL_BUSSINESS_EMAIL,
+        "business": settings.PAYPAL_TEST_BUSSINESS_EMAIL if sandbox else settings.PAYPAL_BUSSINESS_EMAIL,
         "a3": str(order.total()),                      # monthly price
         "p3": period,                           # duration of each unit (depends on unit)
         "t3": duration_unit,                         # duration unit ("M for Month")
@@ -46,6 +58,6 @@ def view_that_asks_for_money(request, order_id):
     print(paypal_dict)
 
     # Create the instance.
-    form = PayPalPaymentsForm(initial=paypal_dict, button_type="subscribe")
+    form = PlansPayPalPaymentsForm(initial=paypal_dict, button_type="subscribe", test_mode_enabled=sandbox)
     context = {"form": form}
     return render(request, "paypal_payments/payment.html", context)
