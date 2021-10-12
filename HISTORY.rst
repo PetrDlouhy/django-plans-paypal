@@ -3,6 +3,10 @@
 History
 -------
 
+0.2.2 (2021-10-12)
+++++++++++++++++++
+fix foregotten pudb
+
 0.2.1 (2021-10-12)
 ++++++++++++++++++
 add sandbox view to be to switch on one server
