@@ -15,7 +15,6 @@ class PlansPayPalPaymentsForm(PayPalPaymentsForm):
     def test_mode(self):
         if self.test_mode_enabled:
             return True
-        import pudb; pudb.set_trace()
         return super().test_mode()
 
 
