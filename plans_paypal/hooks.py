@@ -27,7 +27,10 @@ def show_me_the_money(sender, **kwargs):
         # set on the `business` field. (The user could tamper with
         # that fields on the payment form before it goes to PayPal)
         print(ipn_obj.receiver_email)
-        if ipn_obj.receiver_email != settings.PAYPAL_BUSSINESS_EMAIL:
+        bussiness_email = settings.PAYPAL_BUSSINESS_EMAIL
+        if ipn_obj.test_ipn:
+            bussiness_email = settings.PAYPAL_TEST_BUSSINESS_EMAIL
+        if ipn_obj.receiver_email != bussiness_email:
             # Not a valid payment
             return
 
@@ -48,7 +51,7 @@ def show_me_the_money(sender, **kwargs):
         user_plan.set_plan_renewal(
             order,
             token=ipn_obj.subscr_id,
-            payment_provider="paypal-recurring",
+            payment_provider="paypal-recurring" + ("-sandbox" if ipn_obj.test_ipn else ""),
             has_automatic_renewal=True,
             token_verified=True,
         )

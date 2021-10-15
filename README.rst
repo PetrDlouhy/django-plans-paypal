@@ -60,13 +60,24 @@ Add Django ``plans_paypal`` to the URL patterns:
         ...
     ]
 
-Override `django-plans` class `CreateOrderView` so that `get_success_url()` returns url of `paypal_payment` view:
+Override `django-plans` class `CreateOrderView` so that `get_success_url()` returns url of `paypal-payment` view:
 
 .. code-block:: python
 
     def get_success_url(self):
        return reverse("paypal-payment", kwargs={'order_id': self.object.id})
 
+Sandbox testing
+---------------
+
+Set follwing settings:
+
+.. code-block:: python
+
+   PAYPAL_TEST_BUSSINESS_EMAIL = "foo@bar.com"
+   PAYPAL_TEST = True
+
+Redirect user to `paypal-payment-sandbox` instead of `paypal-payment` view.
 
 Features
 --------
