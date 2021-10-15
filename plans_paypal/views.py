@@ -14,8 +14,8 @@ class PlansPayPalPaymentsForm(PayPalPaymentsForm):
 
     def test_mode(self):
         if self.test_mode_enabled:
-            return True
-        return super().test_mode()
+            return super().test_mode()
+        return False
 
 
 def view_that_asks_for_money(request, order_id, sandbox=False):
