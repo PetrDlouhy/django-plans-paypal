@@ -32,7 +32,7 @@ def show_me_the_money(sender, **kwargs):
             bussiness_email = settings.PAYPAL_TEST_BUSSINESS_EMAIL
         if ipn_obj.receiver_email != bussiness_email:
             # Not a valid payment
-            return
+            raise Exception(f"Returned email doesn't mathch: {ipn_obj.receiver_email} != {bussiness_email}")
 
         # ALSO: for the same reason, you need to check the amount
         # received, `custom` etc. are all what you expect or what
@@ -40,7 +40,7 @@ def show_me_the_money(sender, **kwargs):
 
         # Undertake some action depending upon `ipn_obj`.
         pricing = Pricing.objects.get(pk=custom['pricing_id'])
-        if order.status == 2:
+        if order.status == Order.STATUS.COMPLETED:
             order = Order.objects.create(
                 user=user_plan.user,
                 plan=user_plan.plan,
