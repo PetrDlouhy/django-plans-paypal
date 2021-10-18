@@ -3,10 +3,13 @@
 History
 -------
 
+0.4.1 (2021-10-18)
+++++++++++++++++++
+* cancel order after returning to failure URL
+
 0.4.0 (2021-10-18)
 ++++++++++++++++++
 * allow to set up encrypted PayPal form
-
 
 0.3.0 (2021-10-15)
 ++++++++++++++++++
