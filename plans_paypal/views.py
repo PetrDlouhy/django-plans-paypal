@@ -2,12 +2,12 @@ from django.conf import settings
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 
-from paypal.standard.forms import PayPalPaymentsForm
+from paypal.standard.forms import PayPalPaymentsForm, PayPalEncryptedPaymentsForm
 
 from plans.models import Order
 
 
-class PlansPayPalPaymentsForm(PayPalPaymentsForm):
+class PlansPayPalPaymentsFormMixin:
     def __init__(self, test_mode_enabled=False, *args, **kwargs):
         self.test_mode_enabled = test_mode_enabled
         super().__init__(*args, **kwargs)
@@ -16,6 +16,14 @@ class PlansPayPalPaymentsForm(PayPalPaymentsForm):
         if self.test_mode_enabled:
             return super().test_mode()
         return False
+
+
+class PlansPayPalPaymentsForm(PlansPayPalPaymentsFormMixin, PayPalPaymentsForm):
+    pass
+
+
+class PlansPayPalEncryptedPaymentsForm(PlansPayPalPaymentsFormMixin, PayPalEncryptedPaymentsForm):
+    pass
 
 
 def view_that_asks_for_money(request, order_id, sandbox=False):
@@ -61,6 +69,18 @@ def view_that_asks_for_money(request, order_id, sandbox=False):
     print(paypal_dict)
 
     # Create the instance.
-    form = PlansPayPalPaymentsForm(initial=paypal_dict, button_type="subscribe", test_mode_enabled=sandbox)
+    form_kwargs = {}
+    if getattr(settings, 'PAYPAL_ENCRYPTED_FORM', False):
+        Form = PlansPayPalEncryptedPaymentsForm
+        if sandbox:
+            form_kwargs = {
+                'private_cert': settings.PAYPAL_TEST_PRIVATE_CERT,
+                'public_cert': settings.PAYPAL_TEST_PUBLIC_CERT,
+                'paypal_cert': settings.PAYPAL_TEST_CERT,
+                'cert_id': settings.PAYPAL_TEST_CERT_ID,
+            }
+    else:
+        Form = PlansPayPalPaymentsForm
+    form = Form(initial=paypal_dict, button_type="subscribe", test_mode_enabled=sandbox, **form_kwargs)
     context = {"form": form}
     return render(request, "paypal_payments/payment.html", context)

@@ -50,6 +50,14 @@ Add your bussiness account e-mail address to settings:
 
    PAYPAL_BUSSINESS_EMAIL = "foo@bar.com"
 
+   # To enable encrypted PayPal form:
+   PAYPAL_ENCRYPTED_FORM = True
+   PAYPAL_PRIVATE_CERT = os.path.join(BASE_DIR, 'certs/paypal_private.pem')
+   PAYPAL_PUBLIC_CERT = os.path.join(BASE_DIR, 'certs/paypal_public.pem')
+   PAYPAL_CERT = os.path.join(BASE_DIR, 'certs/paypal_cert.pem')
+   PAYPAL_CERT_ID = 'xxxxx'
+
+
 Add Django ``plans_paypal`` to the URL patterns:
 
 .. code-block:: python
@@ -70,12 +78,19 @@ Override `django-plans` class `CreateOrderView` so that `get_success_url()` retu
 Sandbox testing
 ---------------
 
-Set follwing settings:
+Set following settings:
 
 .. code-block:: python
 
    PAYPAL_TEST_BUSSINESS_EMAIL = "foo@bar.com"
    PAYPAL_TEST = True
+
+   # For encrypted PayPal sandbox form:
+   PAYPAL_TEST_PRIVATE_CERT = os.path.join(BASE_DIR, 'certs/paypal_private.pem')
+   PAYPAL_TEST_PUBLIC_CERT = os.path.join(BASE_DIR, 'certs/paypal_public.pem')
+   PAYPAL_TEST_CERT = os.path.join(BASE_DIR, 'certs/paypal_sandbox_cert.pem')
+   PAYPAL_TEST_CERT_ID = 'xxxx'
+
 
 Redirect user to `paypal-payment-sandbox` instead of `paypal-payment` view.
 
