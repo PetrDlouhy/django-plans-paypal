@@ -3,18 +3,23 @@
 History
 -------
 
+0.4.0 (2021-10-18)
+++++++++++++++++++
+* allow to set up encrypted PayPal form
+
+
 0.3.0 (2021-10-15)
 ++++++++++++++++++
-fixes and improvements to the sandbox/production functionality
-reverse sandbox logic - if no `PAYPAL_TEST`, the sandbox view would return production so nobody can pay through sandbox on production server
+* fixes and improvements to the sandbox/production functionality
+* reverse sandbox logic - if no `PAYPAL_TEST`, the sandbox view would return production so nobody can pay through sandbox on production server
 
 0.2.2 (2021-10-12)
 ++++++++++++++++++
-fix foregotten pudb
+* fix foregotten pudb
 
 0.2.1 (2021-10-12)
 ++++++++++++++++++
-add sandbox view, so both production and sandbox can be used on one server
+* add sandbox view, so both production and sandbox can be used on one server
 
 0.2.0 (2021-10-11)
 ++++++++++++++++++
