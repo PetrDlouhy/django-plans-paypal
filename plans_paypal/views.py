@@ -1,5 +1,5 @@
 from django.conf import settings
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, render, redirect
 from django.urls import reverse
 
 from paypal.standard.forms import PayPalPaymentsForm, PayPalEncryptedPaymentsForm
@@ -62,7 +62,7 @@ def view_that_asks_for_money(request, order_id, sandbox=False):
         "item_name": order.name,
         "notify_url": request.build_absolute_uri(reverse('paypal-ipn')),
         "return": request.build_absolute_uri(reverse('order_payment_success', kwargs={'pk': order_id})),
-        "cancel_return": request.build_absolute_uri(reverse('order_payment_failure', kwargs={'pk': order_id})),
+        "cancel_return": request.build_absolute_uri(reverse('paypal-payment-failure', kwargs={'order_id': order_id})),
         "custom": '{"user_plan_id": %s, "plan_id": %s, "pricing_id": %s, "first_order_id": %s}' % \
         (order.user.userplan.pk, order.plan.pk, order.pricing.pk, order.pk),
     }
@@ -84,3 +84,10 @@ def view_that_asks_for_money(request, order_id, sandbox=False):
     form = Form(initial=paypal_dict, button_type="subscribe", test_mode_enabled=sandbox, **form_kwargs)
     context = {"form": form}
     return render(request, "paypal_payments/payment.html", context)
+
+
+def payment_failure(request, order_id):
+    order = get_object_or_404(Order, pk=order_id)
+    order.status = Order.STATUS.CANCELED
+    order.save()
+    return redirect(reverse('order_payment_failure', kwargs={'pk': order_id}))
