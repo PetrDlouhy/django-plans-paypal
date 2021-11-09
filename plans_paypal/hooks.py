@@ -14,12 +14,18 @@ def show_me_the_money(sender, **kwargs):
     print("Payment status: ", ipn_obj.payment_status)
     print(ipn_obj.receiver_email)
     print(ipn_obj.txn_type)
+
+    if not (ipn_obj.is_subscription_cancellation() or ipn_obj.is_subscription_payment()):
+        # Not a subscription
+        return
+
     custom = json.loads(ipn_obj.custom)
     order = Order.objects.get(pk=custom['first_order_id'])
+    print("Order: ", order.id)
     user_plan = UserPlan.objects.get(pk=custom['user_plan_id'])
     PayPalPayment.objects.create(paypal_ipn=ipn_obj, user_plan=user_plan, order=order)
 
-    if ipn_obj.is_subscription_cancellation():
+    if ipn_obj.is_subscription_cancellation() and hasattr(user_plan, 'recurring'):
         user_plan.recurring.delete()
     elif ipn_obj.is_subscription_payment() and ipn_obj.payment_status == ST_PP_COMPLETED:
         # WARNING !

@@ -3,6 +3,10 @@
 History
 -------
 
+0.4.2 (2021-11-08)
+++++++++++++++++++
+* fix problem with other IPN types
+
 0.4.1 (2021-10-18)
 ++++++++++++++++++
 * cancel order after returning to failure URL
