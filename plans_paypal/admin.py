@@ -18,3 +18,9 @@ class PayPalPaymentAdmin(admin.ModelAdmin):
     search_fields = (
         'user_plan__user__email',
     )
+    readonly_fields = (
+        'author',
+        'created',
+        'modified',
+        'updated_by',
+    )

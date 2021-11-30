@@ -1,6 +1,8 @@
 
 # Additional requirements go here
 
+django-author
+django-extensions
 django-plans
 django-paypal
 django-related-admin

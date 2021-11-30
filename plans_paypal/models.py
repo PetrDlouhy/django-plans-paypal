@@ -1,7 +1,10 @@
+from author.decorators import with_author
 from django.db import models
+from django_extensions.db.models import TimeStampedModel
 
 
-class PayPalPayment(models.Model):
+@with_author
+class PayPalPayment(TimeStampedModel, models.Model):
     order = models.ForeignKey(
         'plans.Order',
         on_delete=models.CASCADE,
