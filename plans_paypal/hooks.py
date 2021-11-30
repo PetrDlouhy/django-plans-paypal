@@ -3,7 +3,7 @@ import json
 from django.conf import settings
 from paypal.standard.ipn.signals import valid_ipn_received
 from paypal.standard.models import ST_PP_COMPLETED
-from plans.models import UserPlan, Order, Pricing
+from plans.models import Order, Pricing, UserPlan
 
 from .models import PayPalPayment
 

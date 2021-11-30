@@ -1,9 +1,8 @@
 from django.conf import settings
-from django.shortcuts import get_object_or_404, render, redirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
-
-from paypal.standard.forms import PayPalPaymentsForm, PayPalEncryptedPaymentsForm
-
+from paypal.standard.forms import (PayPalEncryptedPaymentsForm,
+                                   PayPalPaymentsForm)
 from plans.models import Order
 
 
