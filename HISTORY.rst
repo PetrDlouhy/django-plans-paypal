@@ -3,6 +3,11 @@
 History
 -------
 
+0.4.3 (2021-11-30)
+++++++++++++++++++
+* fix problem with recurring payments
+* add created/modified/author auto fields
+
 0.4.2 (2021-11-08)
 ++++++++++++++++++
 * fix problem with other IPN types
