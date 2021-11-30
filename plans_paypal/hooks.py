@@ -23,7 +23,6 @@ def show_me_the_money(sender, **kwargs):
     order = Order.objects.get(pk=custom['first_order_id'])
     print("Order: ", order.id)
     user_plan = UserPlan.objects.get(pk=custom['user_plan_id'])
-    PayPalPayment.objects.create(paypal_ipn=ipn_obj, user_plan=user_plan, order=order)
 
     if ipn_obj.is_subscription_cancellation() and hasattr(user_plan, 'recurring'):
         user_plan.recurring.delete()
@@ -62,6 +61,7 @@ def show_me_the_money(sender, **kwargs):
             token_verified=True,
         )
         order.complete_order()
+    PayPalPayment.objects.create(paypal_ipn=ipn_obj, user_plan=user_plan, order=order)
 
 
 valid_ipn_received.connect(show_me_the_money)
