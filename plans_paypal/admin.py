@@ -9,6 +9,7 @@ class PayPalPaymentAdmin(admin.ModelAdmin):
         'order',
         'user_plan',
         'paypal_ipn',
+        'created',
     )
     autocomplete_fields = (
         'order',
