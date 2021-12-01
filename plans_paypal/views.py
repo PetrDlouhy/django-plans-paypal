@@ -61,9 +61,16 @@ def view_that_asks_for_money(request, order_id, sandbox=False):
         "item_name": order.name,
         "notify_url": request.build_absolute_uri(reverse('paypal-ipn')),
         "return": request.build_absolute_uri(reverse('order_payment_success', kwargs={'pk': order_id})),
-        "cancel_return": request.build_absolute_uri(reverse('paypal-payment-failure', kwargs={'order_id': order_id})),
-        "custom": '{"user_plan_id": %s, "plan_id": %s, "pricing_id": %s, "first_order_id": %s}' % \
-        (order.user.userplan.pk, order.plan.pk, order.pricing.pk, order.pk),
+        "cancel_return": request.build_absolute_uri(
+            reverse('paypal-payment-failure', kwargs={'order_id': order_id}),
+        ),
+        "custom": {
+            "user_plan_id": order.user.userplan.pk,
+            "plan_id": order.plan.pk,
+            "pricing_id": order.pricing.pk,
+            "first_order_id": order.pk,
+            "user_email": order.user.email,
+        },
     }
     print(paypal_dict)
 
