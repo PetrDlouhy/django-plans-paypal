@@ -3,6 +3,11 @@
 History
 -------
 
+0.4.5 (2021-12-01)
+++++++++++++++++++
+* fix IPN field editing in PayPalPaymentAdmin
+* store also user e-mail in custom to enable search in IPN admin
+
 0.4.4 (2021-12-01)
 ++++++++++++++++++
 * create PayPalPayment before completing the order
