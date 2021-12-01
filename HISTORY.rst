@@ -3,6 +3,10 @@
 History
 -------
 
+0.4.4 (2021-12-01)
+++++++++++++++++++
+* create PayPalPayment before completing the order
+
 0.4.3 (2021-11-30)
 ++++++++++++++++++
 * fix problem with recurring payments

@@ -60,7 +60,9 @@ def show_me_the_money(sender, **kwargs):
             has_automatic_renewal=True,
             token_verified=True,
         )
+        PayPalPayment.objects.create(paypal_ipn=ipn_obj, user_plan=user_plan, order=order)  # use the new order
         order.complete_order()
+        return
     PayPalPayment.objects.create(paypal_ipn=ipn_obj, user_plan=user_plan, order=order)
 
 
