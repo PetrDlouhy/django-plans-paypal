@@ -14,6 +14,8 @@ class PayPalPaymentAdmin(admin.ModelAdmin):
     autocomplete_fields = (
         'order',
         'user_plan',
+    )
+    raw_id_fields = (
         'paypal_ipn',
     )
     search_fields = (
