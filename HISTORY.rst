@@ -3,6 +3,10 @@
 History
 -------
 
+0.4.6 (2021-12-02)
+++++++++++++++++++
+* fix problem with creating bad JSON
+
 0.4.5 (2021-12-01)
 ++++++++++++++++++
 * fix IPN field editing in PayPalPaymentAdmin
