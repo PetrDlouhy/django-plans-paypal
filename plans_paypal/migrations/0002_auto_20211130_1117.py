@@ -11,33 +11,53 @@ class Migration(migrations.Migration):
 
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ('plans_paypal', '0001_initial'),
+        ("plans_paypal", "0001_initial"),
     ]
 
     operations = [
         migrations.AlterModelOptions(
-            name='paypalpayment',
-            options={'get_latest_by': 'modified'},
+            name="paypalpayment",
+            options={"get_latest_by": "modified"},
         ),
         migrations.AddField(
-            model_name='paypalpayment',
-            name='author',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='paypalpayment_create', to=settings.AUTH_USER_MODEL, verbose_name='author'),
+            model_name="paypalpayment",
+            name="author",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.SET_NULL,
+                related_name="paypalpayment_create",
+                to=settings.AUTH_USER_MODEL,
+                verbose_name="author",
+            ),
         ),
         migrations.AddField(
-            model_name='paypalpayment',
-            name='created',
-            field=django_extensions.db.fields.CreationDateTimeField(auto_now_add=True, default=django.utils.timezone.now, verbose_name='created'),
+            model_name="paypalpayment",
+            name="created",
+            field=django_extensions.db.fields.CreationDateTimeField(
+                auto_now_add=True,
+                default=django.utils.timezone.now,
+                verbose_name="created",
+            ),
             preserve_default=False,
         ),
         migrations.AddField(
-            model_name='paypalpayment',
-            name='modified',
-            field=django_extensions.db.fields.ModificationDateTimeField(auto_now=True, verbose_name='modified'),
+            model_name="paypalpayment",
+            name="modified",
+            field=django_extensions.db.fields.ModificationDateTimeField(
+                auto_now=True, verbose_name="modified"
+            ),
         ),
         migrations.AddField(
-            model_name='paypalpayment',
-            name='updated_by',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='paypalpayment_update', to=settings.AUTH_USER_MODEL, verbose_name='last updated by'),
+            model_name="paypalpayment",
+            name="updated_by",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.SET_NULL,
+                related_name="paypalpayment_update",
+                to=settings.AUTH_USER_MODEL,
+                verbose_name="last updated by",
+            ),
         ),
     ]

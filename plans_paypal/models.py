@@ -6,19 +6,19 @@ from django_extensions.db.models import TimeStampedModel
 @with_author
 class PayPalPayment(TimeStampedModel, models.Model):
     order = models.ForeignKey(
-        'plans.Order',
+        "plans.Order",
         on_delete=models.CASCADE,
         null=False,
         blank=False,
     )
     user_plan = models.ForeignKey(
-        'plans.UserPlan',
+        "plans.UserPlan",
         on_delete=models.CASCADE,
         null=False,
         blank=False,
     )
     paypal_ipn = models.OneToOneField(
-        'ipn.PayPalIpn',
+        "ipn.PayPalIpn",
         on_delete=models.CASCADE,
         null=False,
         blank=False,

@@ -3,8 +3,7 @@ import json
 from django.conf import settings
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
-from paypal.standard.forms import (PayPalEncryptedPaymentsForm,
-                                   PayPalPaymentsForm)
+from paypal.standard.forms import PayPalEncryptedPaymentsForm, PayPalPaymentsForm
 from plans.models import Order
 
 
@@ -23,7 +22,9 @@ class PlansPayPalPaymentsForm(PlansPayPalPaymentsFormMixin, PayPalPaymentsForm):
     pass
 
 
-class PlansPayPalEncryptedPaymentsForm(PlansPayPalPaymentsFormMixin, PayPalEncryptedPaymentsForm):
+class PlansPayPalEncryptedPaymentsForm(
+    PlansPayPalPaymentsFormMixin, PayPalEncryptedPaymentsForm
+):
     pass
 
 
@@ -51,20 +52,23 @@ def view_that_asks_for_money(request, order_id, sandbox=False):
     paypal_dict = {
         "cmd": "_xclick-subscriptions",
         "business": (
-            settings.PAYPAL_TEST_BUSSINESS_EMAIL if
-            sandbox else settings.PAYPAL_BUSSINESS_EMAIL
+            settings.PAYPAL_TEST_BUSSINESS_EMAIL
+            if sandbox
+            else settings.PAYPAL_BUSSINESS_EMAIL
         ),
-        "a3": str(order.total()),   # monthly price
-        "p3": period,               # duration of each unit (depends on unit)
-        "t3": duration_unit,        # duration unit ("M for Month")
-        "src": "1",                 # make payments recur
-        "sra": "1",                 # reattempt payment on payment error
-        "no_note": "1",             # remove extra notes (optional)
+        "a3": str(order.total()),  # monthly price
+        "p3": period,  # duration of each unit (depends on unit)
+        "t3": duration_unit,  # duration unit ("M for Month")
+        "src": "1",  # make payments recur
+        "sra": "1",  # reattempt payment on payment error
+        "no_note": "1",  # remove extra notes (optional)
         "item_name": order.name,
-        "notify_url": request.build_absolute_uri(reverse('paypal-ipn')),
-        "return": request.build_absolute_uri(reverse('order_payment_success', kwargs={'pk': order_id})),
+        "notify_url": request.build_absolute_uri(reverse("paypal-ipn")),
+        "return": request.build_absolute_uri(
+            reverse("order_payment_success", kwargs={"pk": order_id})
+        ),
         "cancel_return": request.build_absolute_uri(
-            reverse('paypal-payment-failure', kwargs={'order_id': order_id}),
+            reverse("paypal-payment-failure", kwargs={"order_id": order_id}),
         ),
         "custom": json.dumps(
             {
@@ -74,24 +78,29 @@ def view_that_asks_for_money(request, order_id, sandbox=False):
                 "first_order_id": order.pk,
                 "user_email": order.user.email,
             },
-        )
+        ),
     }
     print(paypal_dict)
 
     # Create the instance.
     form_kwargs = {}
-    if getattr(settings, 'PAYPAL_ENCRYPTED_FORM', False):
+    if getattr(settings, "PAYPAL_ENCRYPTED_FORM", False):
         Form = PlansPayPalEncryptedPaymentsForm
         if sandbox:
             form_kwargs = {
-                'private_cert': settings.PAYPAL_TEST_PRIVATE_CERT,
-                'public_cert': settings.PAYPAL_TEST_PUBLIC_CERT,
-                'paypal_cert': settings.PAYPAL_TEST_CERT,
-                'cert_id': settings.PAYPAL_TEST_CERT_ID,
+                "private_cert": settings.PAYPAL_TEST_PRIVATE_CERT,
+                "public_cert": settings.PAYPAL_TEST_PUBLIC_CERT,
+                "paypal_cert": settings.PAYPAL_TEST_CERT,
+                "cert_id": settings.PAYPAL_TEST_CERT_ID,
             }
     else:
         Form = PlansPayPalPaymentsForm
-    form = Form(initial=paypal_dict, button_type="subscribe", test_mode_enabled=sandbox, **form_kwargs)
+    form = Form(
+        initial=paypal_dict,
+        button_type="subscribe",
+        test_mode_enabled=sandbox,
+        **form_kwargs
+    )
     context = {"form": form}
     return render(request, "paypal_payments/payment.html", context)
 
@@ -100,4 +109,4 @@ def payment_failure(request, order_id):
     order = get_object_or_404(Order, pk=order_id)
     order.status = Order.STATUS.CANCELED
     order.save()
-    return redirect(reverse('order_payment_failure', kwargs={'pk': order_id}))
+    return redirect(reverse("order_payment_failure", kwargs={"pk": order_id}))
