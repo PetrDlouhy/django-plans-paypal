@@ -1,3 +1,5 @@
+import json
+
 from django.conf import settings
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -64,13 +66,15 @@ def view_that_asks_for_money(request, order_id, sandbox=False):
         "cancel_return": request.build_absolute_uri(
             reverse('paypal-payment-failure', kwargs={'order_id': order_id}),
         ),
-        "custom": {
-            "user_plan_id": order.user.userplan.pk,
-            "plan_id": order.plan.pk,
-            "pricing_id": order.pricing.pk,
-            "first_order_id": order.pk,
-            "user_email": order.user.email,
-        },
+        "custom": json.dumps(
+            {
+                "user_plan_id": order.user.userplan.pk,
+                "plan_id": order.plan.pk,
+                "pricing_id": order.pricing.pk,
+                "first_order_id": order.pk,
+                "user_email": order.user.email,
+            },
+        )
     }
     print(paypal_dict)
 
