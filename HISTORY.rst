@@ -3,6 +3,10 @@
 History
 -------
 
+0.4.7 (2022-01-13)
+++++++++++++++++++
+* fix problem if there was ' in custom payment data
+
 0.4.6 (2021-12-02)
 ++++++++++++++++++
 * fix problem with creating bad JSON
