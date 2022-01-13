@@ -1,4 +1,4 @@
-import json
+import ast
 
 from django.conf import settings
 from paypal.standard.ipn.signals import valid_ipn_received
@@ -21,7 +21,7 @@ def show_me_the_money(sender, **kwargs):
         # Not a subscription
         return
 
-    custom = json.loads(ipn_obj.custom)
+    custom = ast.literal_eval(ipn_obj)
     order = Order.objects.get(pk=custom["first_order_id"])
     print("Order: ", order.id)
     user_plan = UserPlan.objects.get(pk=custom["user_plan_id"])
