@@ -21,6 +21,20 @@ def get_version(*file_paths):
     raise RuntimeError("Unable to find version string.")
 
 
+def parse_requirements(file_name):
+    requirements = []
+    for line in open(file_name, "r").read().split("\n"):
+        if re.match(r"(\s*#)|(\s*$)", line):
+            continue
+        if re.match(r"\s*-e\s+", line):
+            requirements.append(re.sub(r"\s*-e\s+.*#egg=(.*)$", r"\1", line))
+        elif re.match(r"(\s*git)|(\s*hg)", line):
+            pass
+        else:
+            requirements.append(line)
+    return requirements
+
+
 version = get_version("plans_paypal", "__init__.py")
 
 
@@ -57,10 +71,7 @@ setup(
         "plans_paypal",
     ],
     include_package_data=True,
-    install_requires=[
-        "django-plans",
-        "django-paypal",
-    ],
+    install_requires=parse_requirements("requirements.txt"),
     license="MIT",
     zip_safe=False,
     keywords="django-plans-paypal",

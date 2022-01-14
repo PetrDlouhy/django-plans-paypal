@@ -9,7 +9,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ("plans", "0006_auto_20200504_1541"),
+        ("plans", "0005_recurring_payments"),
         ("ipn", "0008_auto_20181128_1032"),
     ]
 
