@@ -1,8 +1,6 @@
 # -*- coding: utf-8
 from __future__ import unicode_literals, absolute_import
 
-import django
-
 DEBUG = True
 USE_TZ = True
 
@@ -23,13 +21,36 @@ INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.sites",
     "plans",
-    "paypal",
+    "paypal.standard.ipn",
     "plans_paypal",
 ]
 
 SITE_ID = 1
 
-if django.VERSION >= (1, 10):
-    MIDDLEWARE = ()
-else:
-    MIDDLEWARE_CLASSES = ()
+PAYPAL_BUSSINESS_EMAIL = "fake@email.com"
+
+MIDDLEWARE = (
+    "author.middlewares.AuthorDefaultBackendMiddleware",
+)
+
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [
+        ],
+        "APP_DIRS": False,
+        "OPTIONS": {
+            "debug": True,
+            "context_processors": [
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+            ],
+            "loaders": (
+                "admin_tools.template_loaders.Loader",
+                "django.template.loaders.filesystem.Loader",
+                "django.template.loaders.app_directories.Loader",
+            ),
+        },
+    },
+]

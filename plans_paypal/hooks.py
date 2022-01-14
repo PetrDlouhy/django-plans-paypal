@@ -8,7 +8,7 @@ from plans.models import Order, Pricing, UserPlan
 from .models import PayPalPayment
 
 
-def show_me_the_money(sender, **kwargs):
+def receive_ipn(sender, **kwargs):
     print("paypal hook")
     ipn_obj = sender
     print("Payment status: ", ipn_obj.payment_status)
@@ -19,7 +19,7 @@ def show_me_the_money(sender, **kwargs):
         ipn_obj.is_subscription_cancellation() or ipn_obj.is_subscription_payment()
     ):
         # Not a subscription
-        return
+        return None
 
     custom = ast.literal_eval(ipn_obj.custom)
     order = Order.objects.get(pk=custom["first_order_id"])
@@ -42,7 +42,7 @@ def show_me_the_money(sender, **kwargs):
         if ipn_obj.receiver_email != bussiness_email:
             # Not a valid payment
             raise Exception(
-                f"Returned email doesn't mathch: {ipn_obj.receiver_email} != {bussiness_email}"
+                f"Returned email doesn't match: '{ipn_obj.receiver_email}' != '{bussiness_email}'"
             )
 
         # ALSO: for the same reason, you need to check the amount
@@ -67,12 +67,12 @@ def show_me_the_money(sender, **kwargs):
             has_automatic_renewal=True,
             token_verified=True,
         )
-        PayPalPayment.objects.create(
+        paypal_payment = PayPalPayment.objects.create(
             paypal_ipn=ipn_obj, user_plan=user_plan, order=order
         )  # use the new order
         order.complete_order()
-        return
-    PayPalPayment.objects.create(paypal_ipn=ipn_obj, user_plan=user_plan, order=order)
+        return paypal_payment
+    return PayPalPayment.objects.create(paypal_ipn=ipn_obj, user_plan=user_plan, order=order)
 
 
-valid_ipn_received.connect(show_me_the_money)
+valid_ipn_received.connect(receive_ipn)

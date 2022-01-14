@@ -18,7 +18,7 @@ class PayPalPayment(TimeStampedModel, models.Model):
         blank=False,
     )
     paypal_ipn = models.OneToOneField(
-        "ipn.PayPalIpn",
+        "ipn.PayPalIPN",
         on_delete=models.CASCADE,
         null=False,
         blank=False,
