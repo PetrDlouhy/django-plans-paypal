@@ -21,7 +21,7 @@ def show_me_the_money(sender, **kwargs):
         # Not a subscription
         return
 
-    custom = ast.literal_eval(ipn_obj)
+    custom = ast.literal_eval(ipn_obj.custom)
     order = Order.objects.get(pk=custom["first_order_id"])
     print("Order: ", order.id)
     user_plan = UserPlan.objects.get(pk=custom["user_plan_id"])
