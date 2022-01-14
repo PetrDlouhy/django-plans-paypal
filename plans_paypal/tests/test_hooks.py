@@ -1,6 +1,7 @@
 from django.test import TestCase
 from model_bakery import baker
 from paypal.standard.models import ST_PP_COMPLETED
+
 from plans_paypal.hooks import receive_ipn
 
 
