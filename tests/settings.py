@@ -30,15 +30,12 @@ SITE_ID = 1
 
 PAYPAL_BUSSINESS_EMAIL = "fake@email.com"
 
-MIDDLEWARE = (
-    "author.middlewares.AuthorDefaultBackendMiddleware",
-)
+MIDDLEWARE = ("author.middlewares.AuthorDefaultBackendMiddleware",)
 
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [
-        ],
+        "DIRS": [],
         "APP_DIRS": False,
         "OPTIONS": {
             "debug": True,

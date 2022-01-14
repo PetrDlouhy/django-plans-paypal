@@ -72,7 +72,9 @@ def receive_ipn(sender, **kwargs):
         )  # use the new order
         order.complete_order()
         return paypal_payment
-    return PayPalPayment.objects.create(paypal_ipn=ipn_obj, user_plan=user_plan, order=order)
+    return PayPalPayment.objects.create(
+        paypal_ipn=ipn_obj, user_plan=user_plan, order=order
+    )
 
 
 valid_ipn_received.connect(receive_ipn)

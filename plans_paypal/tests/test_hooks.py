@@ -7,7 +7,7 @@ from plans_paypal.hooks import receive_ipn
 
 class HooksTests(TestCase):
     def test_receive_ipn_no_subscription(self):
-        ipn = baker.make('PayPalIPN')
+        ipn = baker.make("PayPalIPN")
         paypal_payment = receive_ipn(ipn)
         self.assertEqual(paypal_payment, None)
 
@@ -15,8 +15,8 @@ class HooksTests(TestCase):
         order = baker.make("Order")
         user_plan = baker.make("UserPlan")
         ipn = baker.make(
-            'PayPalIPN',
-            txn_type='subscr_payment',
+            "PayPalIPN",
+            txn_type="subscr_payment",
             custom="{"
             f"'first_order_id': {order.id},"
             f"'user_plan_id': {user_plan.id},"
@@ -30,15 +30,17 @@ class HooksTests(TestCase):
         order = baker.make("Order")
         user_plan = baker.make("UserPlan")
         ipn = baker.make(
-            'PayPalIPN',
-            txn_type='subscr_payment',
+            "PayPalIPN",
+            txn_type="subscr_payment",
             payment_status=ST_PP_COMPLETED,
             custom="{"
             f"'first_order_id': {order.id},"
             f"'user_plan_id': {user_plan.id},"
             "}",
         )
-        with self.assertRaisesRegex(Exception, "Returned email doesn't match: '' != 'fake@email.com'"):
+        with self.assertRaisesRegex(
+            Exception, "Returned email doesn't match: '' != 'fake@email.com'"
+        ):
             receive_ipn(ipn)
 
     def test_receive_ipn_completed(self):
@@ -48,8 +50,8 @@ class HooksTests(TestCase):
         order.user.save()
         pricing = baker.make("Pricing")
         ipn = baker.make(
-            'PayPalIPN',
-            txn_type='subscr_payment',
+            "PayPalIPN",
+            txn_type="subscr_payment",
             payment_status=ST_PP_COMPLETED,
             receiver_email="fake@email.com",
             custom="{"
