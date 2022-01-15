@@ -59,15 +59,14 @@ jobs:
 
       - name: Testing
         run: |
-          python -m coverage run manage.py test
-          # case "$matrix.python-version" in
-          #   "3.10")  # Django runs with warnings in this python version
-          #     python -m coverage run manage.py test
-          #     ;;
-          #   *)
-          #     python -W error::DeprecationWarning -m coverage run manage.py test
-          #     ;;
-          # esac
+          case "${{ matrix.python-version }}" in
+            3.10)  # Django runs with warnings in this python version
+              python -m coverage run manage.py test
+              ;;
+            *)
+              python -W error::DeprecationWarning -m coverage run manage.py test
+              ;;
+          esac
   lint:
     runs-on: ubuntu-latest
     steps:
