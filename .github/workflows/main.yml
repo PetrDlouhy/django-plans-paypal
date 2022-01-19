@@ -44,6 +44,7 @@ jobs:
         run: |
            pip install "setuptools<58"
            pip install -e . "setuptools<58"
+          # TODO: drop the setuptools constraint once MR #154 and #149 are released
       - name: Install requirements
         run: |
            pip install --upgrade --upgrade-strategy eager -r requirements.txt
@@ -52,6 +53,7 @@ jobs:
         run: |
           pip uninstall -y django-plans
           pip install git+https://github.com/PetrDlouhy/django-plans@django40#egg=django-plans
+          # TODO: delete the 2 lines above once MR #154 and #149 are released
       - name: Install django
         run: pip install Django==${{ matrix.DJANGO_VERSION }}
       - name: Install codecov
@@ -74,13 +76,16 @@ jobs:
       - name: Install
         run: |
           pip install -r requirements_test.txt
+      - name: Install django-plans
+        run: |
+          pip uninstall -y django-plans
+          pip install git+https://github.com/PetrDlouhy/django-plans@django40#egg=django-plans
+          # TODO: delete the 2 lines above once MR #154 and #149 are released
       - name: Running Flake8
         run: flake8
       - name: Running isort
         run: python -m isort . --check-only --diff
       - name: Running black
         run: black --check .
-      - name: Running black
-        run: black --check .
       - name: Running mypy
-        run: mypy plans_paypal
+        run: PYTHONPATH="." mypy .

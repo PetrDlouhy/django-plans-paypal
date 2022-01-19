@@ -4,6 +4,8 @@ import os
 import re
 import sys
 
+from setuptools import find_packages
+
 
 try:
     from setuptools import setup
@@ -67,9 +69,7 @@ setup(
     author="Petr Dlouhý",
     author_email="petr.dlouhy@email.cz",
     url="https://github.com/PetrDlouhy/django-plans-paypal",
-    packages=[
-        "plans_paypal",
-    ],
+    packages=find_packages(),
     include_package_data=True,
     install_requires=parse_requirements("requirements.txt"),
     license="MIT",
