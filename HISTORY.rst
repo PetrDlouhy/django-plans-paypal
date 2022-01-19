@@ -3,6 +3,11 @@
 History
 -------
 
+0.4.8 (2022-01-19)
+++++++++++++++++++
+* fix last release
+* add tests and test on all supported Django/Python versions through GitHub actions
+
 0.4.7 (2022-01-13)
 ++++++++++++++++++
 * fix problem if there was ' in custom payment data
