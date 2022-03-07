@@ -3,6 +3,10 @@
 History
 -------
 
+0.4.9 (2022-03-07)
+++++++++++++++++++
+* make parsing custom_data more robust
+
 0.4.8 (2022-01-19)
 ++++++++++++++++++
 * fix last release
