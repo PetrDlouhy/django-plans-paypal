@@ -7,6 +7,9 @@ from plans.models import Order, Pricing, UserPlan
 
 from .models import PayPalPayment
 
+def parse_custom(custom):
+    custom = custom.replace("null", "None")
+    return ast.literal_eval(custom)
 
 def receive_ipn(sender, **kwargs):
     print("paypal hook")
@@ -21,7 +24,7 @@ def receive_ipn(sender, **kwargs):
         # Not a subscription
         return None
 
-    custom = ast.literal_eval(ipn_obj.custom)
+    custom = parse_custom(ipn_obj.custom)
     order = Order.objects.get(pk=custom["first_order_id"])
     print("Order: ", order.id)
     user_plan = UserPlan.objects.get(pk=custom["user_plan_id"])

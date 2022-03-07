@@ -2,7 +2,7 @@ from django.test import TestCase
 from model_bakery import baker
 from paypal.standard.models import ST_PP_COMPLETED
 
-from plans_paypal.hooks import receive_ipn
+from plans_paypal.hooks import parse_custom, receive_ipn
 
 
 class HooksTests(TestCase):
@@ -10,6 +10,16 @@ class HooksTests(TestCase):
         ipn = baker.make("PayPalIPN")
         paypal_payment = receive_ipn(ipn)
         self.assertEqual(paypal_payment, None)
+
+    def test_parse_custom(self):
+        self.assertEqual(
+            parse_custom(
+                '{"user_plan_id": 250329, "plan_id": 1, '
+                '\'pricing_id\': 1, "first_order_id": 32782, "user_email": null}'
+            ),
+            {"user_plan_id": 250329, "plan_id": 1,
+             "pricing_id": 1, "first_order_id": 32782, "user_email": None},
+        )
 
     def test_receive_ipn(self):
         order = baker.make("Order")
