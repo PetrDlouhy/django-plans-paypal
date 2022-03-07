@@ -17,8 +17,13 @@ class HooksTests(TestCase):
                 '{"user_plan_id": 250329, "plan_id": 1, '
                 '\'pricing_id\': 1, "first_order_id": 32782, "user_email": null}'
             ),
-            {"user_plan_id": 250329, "plan_id": 1,
-             "pricing_id": 1, "first_order_id": 32782, "user_email": None},
+            {
+                "user_plan_id": 250329,
+                "plan_id": 1,
+                "pricing_id": 1,
+                "first_order_id": 32782,
+                "user_email": None,
+            },
         )
 
     def test_receive_ipn(self):

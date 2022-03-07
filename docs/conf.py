@@ -49,8 +49,8 @@ source_suffix = ".rst"
 master_doc = "index"
 
 # General information about the project.
-project = u"Django plans paypal"
-copyright = u"2020, Petr Dlouhý"
+project = "Django plans paypal"
+copyright = "2020, Petr Dlouhý"
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -196,8 +196,8 @@ latex_documents = [
     (
         "index",
         "django-plans-paypal.tex",
-        u"Django plans paypal Documentation",
-        u"Petr Dlouhý",
+        "Django plans paypal Documentation",
+        "Petr Dlouhý",
         "manual",
     ),
 ]
@@ -231,8 +231,8 @@ man_pages = [
     (
         "index",
         "django-plans-paypal",
-        u"Django plans paypal Documentation",
-        [u"Petr Dlouhý"],
+        "Django plans paypal Documentation",
+        ["Petr Dlouhý"],
         1,
     )
 ]
@@ -250,8 +250,8 @@ texinfo_documents = [
     (
         "index",
         "django-plans-paypal",
-        u"Django plans paypal Documentation",
-        u"Petr Dlouhý",
+        "Django plans paypal Documentation",
+        "Petr Dlouhý",
         "django-plans-paypal",
         "One line description of project.",
         "Miscellaneous",
