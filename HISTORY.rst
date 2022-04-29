@@ -3,6 +3,11 @@
 History
 -------
 
+0.4.10 (xxxx-xx-xx)
+++++++++++++++++++
+* fix problem with duplicate payments
+* PayPalPaymentAdmin: display connected IPN fields
+
 0.4.9 (2022-03-07)
 ++++++++++++++++++
 * make parsing custom_data more robust
