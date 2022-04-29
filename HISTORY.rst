@@ -3,8 +3,8 @@
 History
 -------
 
-0.4.10 (xxxx-xx-xx)
-++++++++++++++++++
+0.4.10 (2022-04-29)
++++++++++++++++++++
 * fix problem with duplicate payments
 * PayPalPaymentAdmin: display connected IPN fields
 
