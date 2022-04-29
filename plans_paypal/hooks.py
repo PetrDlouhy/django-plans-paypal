@@ -33,6 +33,7 @@ def receive_ipn(sender, **kwargs):
 
     if ipn_obj.is_subscription_cancellation() and hasattr(user_plan, "recurring"):
         user_plan.recurring.delete()
+        return None
     elif (
         ipn_obj.is_subscription_payment() and ipn_obj.payment_status == ST_PP_COMPLETED
     ):
