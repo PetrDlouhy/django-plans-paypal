@@ -77,9 +77,7 @@ def receive_ipn(sender, **kwargs):
         )  # use the new order
         order.complete_order()
         return paypal_payment
-    return PayPalPayment.objects.create(
-        paypal_ipn=ipn_obj, user_plan=user_plan, order=order
-    )
+    raise Exception(f"IPN with unknown status: {ipn_obj}")
 
 
 valid_ipn_received.connect(receive_ipn)
