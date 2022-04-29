@@ -9,6 +9,8 @@ class PayPalPaymentAdmin(admin.ModelAdmin):
         "order",
         "user_plan",
         "paypal_ipn",
+        "paypal_status",
+        "paypal_email",
         "created",
     )
     autocomplete_fields = (
@@ -23,3 +25,9 @@ class PayPalPaymentAdmin(admin.ModelAdmin):
         "modified",
         "updated_by",
     )
+
+    def paypal_status(self, obj):
+        return obj.paypal_ipn.payment_status
+
+    def paypal_email(self, obj):
+        return obj.paypal_ipn.payer_email
