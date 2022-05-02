@@ -31,8 +31,9 @@ def receive_ipn(sender, **kwargs):
     print("Order: ", order.id)
     user_plan = UserPlan.objects.get(pk=custom["user_plan_id"])
 
-    if ipn_obj.is_subscription_cancellation() and hasattr(user_plan, "recurring"):
-        user_plan.recurring.delete()
+    if ipn_obj.is_subscription_cancellation():
+        if hasattr(user_plan, "recurring"):
+            user_plan.recurring.delete()
         return None
     elif (
         ipn_obj.is_subscription_payment() and ipn_obj.payment_status == ST_PP_COMPLETED
