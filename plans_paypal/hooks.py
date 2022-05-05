@@ -2,7 +2,7 @@ import ast
 
 from django.conf import settings
 from paypal.standard.ipn.signals import valid_ipn_received
-from paypal.standard.models import ST_PP_COMPLETED
+from paypal.standard.models import ST_PP_COMPLETED, ST_PP_PENDING
 from plans.models import Order, Pricing, UserPlan
 
 from .models import PayPalPayment
@@ -34,6 +34,9 @@ def receive_ipn(sender, **kwargs):
     if ipn_obj.is_subscription_cancellation():
         if hasattr(user_plan, "recurring"):
             user_plan.recurring.delete()
+        return None
+    elif ipn_obj.is_subscription_payment() and ipn_obj.payment_status == ST_PP_PENDING:
+        # Pending status
         return None
     elif (
         ipn_obj.is_subscription_payment() and ipn_obj.payment_status == ST_PP_COMPLETED
