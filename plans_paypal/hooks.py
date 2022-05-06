@@ -46,7 +46,7 @@ def receive_ipn(sender, **kwargs):
 
     if ipn_obj.is_subscription_cancellation():
         if user_plan and hasattr(user_plan, "recurring"):
-            if user_plan.recurring.token == ipn_obj.subscr_id:
+            if str(user_plan.recurring.token) == str(ipn_obj.subscr_id):
                 user_plan.recurring.delete()
             else:
                 logger.warning(

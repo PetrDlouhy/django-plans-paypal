@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.test import TestCase
 from model_bakery import baker
 from paypal.standard.models import ST_PP_COMPLETED
@@ -27,7 +29,8 @@ class HooksTests(TestCase):
             },
         )
 
-    def test_receive_ipn_exception(self):
+    @patch("plans_paypal.hooks.logger")
+    def test_receive_ipn_exception(self, mock_logger):
         order = baker.make("Order")
         user_plan = baker.make("UserPlan")
         ipn = baker.make(
@@ -38,8 +41,10 @@ class HooksTests(TestCase):
             f"'user_plan_id': {user_plan.id},"
             "}",
         )
-        with self.assertRaisesRegex(Exception, "IPN with unknown status: PayPalIPN:"):
-            receive_ipn(ipn)
+        self.assertEqual(receive_ipn(ipn), None)
+        mock_logger.error.assert_called_with(
+            "IPN with unknown status", extra={"ipn_obj": ipn, "ipn_status": ""}
+        )
 
     def test_receive_ipn_completed_email_does_not_match(self):
         order = baker.make("Order")
@@ -111,7 +116,7 @@ class HooksTests(TestCase):
         """
         user = baker.make("User", username="foobar")
         user_plan = baker.make("UserPlan", user=user)
-        baker.make("RecurringUserPlan", user_plan=user_plan)
+        baker.make("RecurringUserPlan", user_plan=user_plan, token=1234)
         # recurring_up = baker.make("RecurringUserPlan", user_plan=user_plan)
         order = baker.make("Order", user=user, status=Order.STATUS.COMPLETED)
         order.user.save()
@@ -120,6 +125,7 @@ class HooksTests(TestCase):
             "PayPalIPN",
             txn_type="subscr_cancel",
             receiver_email="fake@email.com",
+            subscr_id=1234,
             custom="{"
             f"'first_order_id': {order.id},"
             f"'user_plan_id': {user_plan.id},"
