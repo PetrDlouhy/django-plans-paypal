@@ -30,13 +30,22 @@ def receive_ipn(sender, **kwargs):
         # Not a subscription
         return None
 
-    custom = parse_custom(ipn_obj.custom)
-    order = Order.objects.get(pk=custom["first_order_id"])
-    print("Order: ", order.id)
-    user_plan = UserPlan.objects.get(pk=custom["user_plan_id"])
+    try:
+        custom = parse_custom(ipn_obj.custom)
+        order = Order.objects.get(pk=custom["first_order_id"])
+        print("Order: ", order.id)
+        user_plan = UserPlan.objects.get(pk=custom["user_plan_id"])
+    except SyntaxError:
+        logger.error(
+            "Can't parse custom data",
+            extra={
+                "custom_data": ipn_obj.custom,
+                "ipn_obj": ipn_obj,
+            },
+        )
 
     if ipn_obj.is_subscription_cancellation():
-        if hasattr(user_plan, "recurring"):
+        if user_plan and hasattr(user_plan, "recurring"):
             if user_plan.recurring.token == ipn_obj.subscr_id:
                 user_plan.recurring.delete()
             else:
