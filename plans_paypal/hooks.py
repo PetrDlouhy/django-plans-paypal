@@ -1,4 +1,5 @@
 import ast
+import logging
 
 from django.conf import settings
 from paypal.standard.ipn.signals import valid_ipn_received
@@ -6,6 +7,9 @@ from paypal.standard.models import ST_PP_COMPLETED, ST_PP_PENDING
 from plans.models import Order, Pricing, UserPlan
 
 from .models import PayPalPayment
+
+
+logger = logging.getLogger(__name__)
 
 
 def parse_custom(custom):
@@ -33,7 +37,18 @@ def receive_ipn(sender, **kwargs):
 
     if ipn_obj.is_subscription_cancellation():
         if hasattr(user_plan, "recurring"):
-            user_plan.recurring.delete()
+            if user_plan.recurring.token == ipn_obj.subscr_id:
+                user_plan.recurring.delete()
+            else:
+                logger.warning(
+                    "Recurring user plan not found by ID, can't cancell subscription",
+                    extra={
+                        "recurring_token": user_plan.recurring.token,
+                        "ipn_token": ipn_obj.subscr_id,
+                        "recurring": user_plan.recurring,
+                        "ipn_obj": ipn_obj,
+                    },
+                )
         return None
     elif ipn_obj.is_subscription_payment() and ipn_obj.payment_status == ST_PP_PENDING:
         # Pending status
@@ -82,7 +97,13 @@ def receive_ipn(sender, **kwargs):
         )  # use the new order
         order.complete_order()
         return paypal_payment
-    raise Exception(f"IPN with unknown status: {ipn_obj}")
+    logger.error(
+        "IPN with unknown status",
+        extra={
+            "ipn_obj": ipn_obj,
+            "ipn_status": ipn_obj.payment_status,
+        },
+    )
 
 
 valid_ipn_received.connect(receive_ipn)
