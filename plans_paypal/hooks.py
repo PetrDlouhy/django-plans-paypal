@@ -85,7 +85,7 @@ def receive_ipn(sender, **kwargs):
 
         # Undertake some action depending upon `ipn_obj`.
         pricing = Pricing.objects.get(pk=custom["pricing_id"])
-        if order.status == Order.STATUS.COMPLETED:
+        if order.status != Order.STATUS.NEW:
             order = Order.objects.create(
                 user=user_plan.user,
                 plan=user_plan.plan,
