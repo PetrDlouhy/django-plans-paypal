@@ -70,6 +70,7 @@ def view_that_asks_for_money(request, order_id, sandbox=False):
         "cancel_return": request.build_absolute_uri(
             reverse("paypal-payment-failure", kwargs={"order_id": order_id}),
         ),
+        "item_number": order.pk,
         "custom": json.dumps(
             {
                 "user_plan_id": order.user.userplan.pk,
@@ -80,6 +81,9 @@ def view_that_asks_for_money(request, order_id, sandbox=False):
             },
         ),
     }
+
+    paypal_dict["custom"] = paypal_dict["custom"][:255]
+
     print(paypal_dict)
 
     # Create the instance.

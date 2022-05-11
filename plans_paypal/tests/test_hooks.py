@@ -31,8 +31,8 @@ class HooksTests(TestCase):
 
     @patch("plans_paypal.hooks.logger")
     def test_receive_ipn_exception(self, mock_logger):
-        order = baker.make("Order")
         user_plan = baker.make("UserPlan")
+        order = baker.make("Order", user=user_plan.user)
         ipn = baker.make(
             "PayPalIPN",
             txn_type="subscr_payment",
@@ -47,8 +47,8 @@ class HooksTests(TestCase):
         )
 
     def test_receive_ipn_completed_email_does_not_match(self):
-        order = baker.make("Order")
         user_plan = baker.make("UserPlan")
+        order = baker.make("Order", user=user_plan.user)
         ipn = baker.make(
             "PayPalIPN",
             txn_type="subscr_payment",

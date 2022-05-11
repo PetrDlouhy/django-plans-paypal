@@ -4,7 +4,7 @@ import logging
 from django.conf import settings
 from paypal.standard.ipn.signals import valid_ipn_received
 from paypal.standard.models import ST_PP_COMPLETED, ST_PP_PENDING
-from plans.models import Order, Pricing, UserPlan
+from plans.models import Order
 
 from .models import PayPalPayment
 
@@ -15,6 +15,21 @@ logger = logging.getLogger(__name__)
 def parse_custom(custom):
     custom = custom.replace("null", "None")
     return ast.literal_eval(custom)
+
+
+def get_order_id(ipn_obj):
+    try:
+        custom = parse_custom(ipn_obj.custom)
+        return custom["first_order_id"]
+    except SyntaxError:
+        logger.error(
+            "Can't parse custom data",
+            extra={
+                "custom_data": ipn_obj.custom,
+                "ipn_obj": ipn_obj,
+            },
+        )
+        return ipn_obj.item_number
 
 
 def receive_ipn(sender, **kwargs):
@@ -30,19 +45,9 @@ def receive_ipn(sender, **kwargs):
         # Not a subscription
         return None
 
-    try:
-        custom = parse_custom(ipn_obj.custom)
-        order = Order.objects.get(pk=custom["first_order_id"])
-        print("Order: ", order.id)
-        user_plan = UserPlan.objects.get(pk=custom["user_plan_id"])
-    except SyntaxError:
-        logger.error(
-            "Can't parse custom data",
-            extra={
-                "custom_data": ipn_obj.custom,
-                "ipn_obj": ipn_obj,
-            },
-        )
+    order = Order.objects.get(pk=get_order_id(ipn_obj))
+    print("Order: ", order.id)
+    user_plan = order.user.userplan
 
     if ipn_obj.is_subscription_cancellation():
         if user_plan and hasattr(user_plan, "recurring"):
@@ -84,12 +89,11 @@ def receive_ipn(sender, **kwargs):
         # is allowed.
 
         # Undertake some action depending upon `ipn_obj`.
-        pricing = Pricing.objects.get(pk=custom["pricing_id"])
         if order.status != Order.STATUS.NEW:
             order = Order.objects.create(
                 user=user_plan.user,
                 plan=user_plan.plan,
-                pricing=pricing,
+                pricing=order.pricing,
                 amount=ipn_obj.mc_gross,
                 currency=ipn_obj.mc_currency,
             )
