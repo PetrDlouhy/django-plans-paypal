@@ -103,7 +103,7 @@ def view_that_asks_for_money(request, order_id, sandbox=False):
         initial=paypal_dict,
         button_type="subscribe",
         test_mode_enabled=sandbox,
-        **form_kwargs
+        **form_kwargs,
     )
     context = {"form": form}
     return render(request, "paypal_payments/payment.html", context)
