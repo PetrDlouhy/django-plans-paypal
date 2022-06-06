@@ -62,7 +62,7 @@ def view_that_asks_for_money(request, order_id, sandbox=False):
         "src": "1",  # make payments recur
         "sra": "1",  # reattempt payment on payment error
         "no_note": "1",  # remove extra notes (optional)
-        "item_name": order.name + " Order ID: {order.pk}",
+        "item_name": f"{order.name} Order ID: {order.pk}",
         "notify_url": request.build_absolute_uri(reverse("paypal-ipn")),
         "return": request.build_absolute_uri(
             reverse("order_payment_success", kwargs={"pk": order_id})
