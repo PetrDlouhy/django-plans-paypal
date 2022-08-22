@@ -22,11 +22,19 @@ jobs:
         
     strategy:
       matrix:
-        DJANGO_VERSION: [ '2.2.*', '3.0.*', '3.1.*', '3.2.*', '4.0.*']
+        DJANGO_VERSION: [ '2.2.*', '3.0.*', '3.1.*', '3.2.*', '4.0.*', '4.1.*']
         python-version: ['3.7', '3.8', '3.9', '3.10']
         exclude:
+          - DJANGO_VERSION: '4.1.*'
+            python-version: '3.7'
           - DJANGO_VERSION: '4.0.*'
             python-version: '3.7'
+          - DJANGO_VERSION: '3.1.*'
+            python-version: '3.10'
+          - DJANGO_VERSION: '3.0.*'
+            python-version: '3.10'
+          - DJANGO_VERSION: '2.2.*'
+            python-version: '3.10'
 
       fail-fast: false
     steps:
@@ -60,15 +68,8 @@ jobs:
         run: pip install codecov
 
       - name: Testing
-        run: |
-          case "${{ matrix.python-version }}" in
-            3.10)  # Django runs with warnings in this python version
-              python -m coverage run manage.py test
-              ;;
-            *)
-              python -W error::DeprecationWarning -m coverage run manage.py test
-              ;;
-          esac
+        run: python -W error::DeprecationWarning -m coverage run manage.py test
+
   lint:
     runs-on: ubuntu-latest
     steps:
