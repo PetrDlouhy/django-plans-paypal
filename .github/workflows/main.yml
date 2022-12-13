@@ -63,8 +63,9 @@ jobs:
         run: pip install codecov
 
       - name: Testing
-        run: python -W error::DeprecationWarning -m coverage run manage.py test
-
+        run: |
+          python -W error::DeprecationWarning -m coverage run manage.py test
+          coverage xml && codecov
   lint:
     runs-on: ubuntu-latest
     steps:
