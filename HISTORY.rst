@@ -3,6 +3,15 @@
 History
 -------
 
+0.5.0 (2022-12-14)
++++++++++++++++++++
+
+* Fix tax received on recurring payments
+* More robust receiving original Order ID (if PayPal fails to handle custom_data)
+* update to Django 4.1
+* fix completing recurring payments if first order status is returned
+* only log error if custom data can't be parsed
+
 0.4.10 (2022-04-29)
 +++++++++++++++++++
 * fix problem with duplicate payments
