@@ -5,8 +5,8 @@ Django plans paypal
 .. image:: https://badge.fury.io/py/django-plans-paypal.svg
     :target: https://badge.fury.io/py/django-plans-paypal
 
-.. image:: https://travis-ci.org/PetrDlouhy/django-plans-paypal.svg?branch=master
-    :target: https://travis-ci.org/PetrDlouhy/django-plans-paypal
+.. image:: https://github.com/PetrDlouhy/django-plans-paypal/actions/workflows/main.yml/badge.svg
+    :target: https://github.com/PetrDlouhy/django-plans-paypal/actions/workflows/main.yml
 
 .. image:: https://codecov.io/gh/PetrDlouhy/django-plans-paypal/branch/master/graph/badge.svg
     :target: https://codecov.io/gh/PetrDlouhy/django-plans-paypal
