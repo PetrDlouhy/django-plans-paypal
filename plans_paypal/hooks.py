@@ -95,6 +95,7 @@ def receive_ipn(sender, **kwargs):
                 plan=user_plan.plan,
                 pricing=order.pricing,
                 amount=ipn_obj.mc_gross,
+                tax=order.tax,
                 currency=ipn_obj.mc_currency,
             )
         user_plan.set_plan_renewal(
