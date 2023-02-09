@@ -1,8 +1,10 @@
 import json
 
 from django.conf import settings
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.views.generic import View
 from paypal.standard.forms import PayPalEncryptedPaymentsForm, PayPalPaymentsForm
 from plans.models import Order
 
@@ -109,8 +111,9 @@ def view_that_asks_for_money(request, order_id, sandbox=False):
     return render(request, "paypal_payments/payment.html", context)
 
 
-def payment_failure(request, order_id):
-    order = get_object_or_404(Order, pk=order_id)
-    order.status = Order.STATUS.CANCELED
-    order.save()
-    return redirect(reverse("order_payment_failure", kwargs={"pk": order_id}))
+class PaymentFailureView(LoginRequiredMixin, View):
+    def get(self, request, *args, order_id=None, payment_variant=None):
+        order = get_object_or_404(Order, pk=order_id, user=request.user)
+        order.status = Order.STATUS.CANCELED
+        order.save()
+        return redirect(reverse("order_payment_failure", kwargs={"pk": order_id}))
