@@ -36,3 +36,22 @@ class PaymentFailureViewTests(TestCase):
             + reverse("paypal-payment-failure", args=[order.id]),
             target_status_code=404,
         )
+
+
+class PayPalPaymentViewTests(TestCase):
+    def test_paypal_payment_view(self):
+        order = baker.make(
+            Order,
+            user=baker.make("User"),
+            pricing__period=30,
+            pricing__name="test pricing",
+            plan__name="test plan",
+        )
+        baker.make("UserPlan", user=order.user)
+        response = self.client.get(reverse("paypal-payment", args=[order.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            "<h1>Confirm our subscribtion</h1>",
+            html=True,
+        )

@@ -26,6 +26,7 @@ INSTALLED_APPS = [
     "plans",
     "paypal.standard.ipn",
     "plans_paypal",
+    "tests",
 ]
 
 SITE_ID = 1
