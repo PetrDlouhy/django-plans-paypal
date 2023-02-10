@@ -6,4 +6,5 @@ from django.urls import include, path
 
 urlpatterns = [
     path("", include("plans_paypal.urls")),
+    path("plans", include("plans.urls")),
 ]

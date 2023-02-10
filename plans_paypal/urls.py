@@ -18,7 +18,7 @@ urlpatterns = [
     path("paypal/", include("paypal.standard.ipn.urls")),
     path(
         "paypal-payment/<int:order_id>/cancel",
-        views.payment_failure,
+        views.PaymentFailureView.as_view(),
         name="paypal-payment-failure",
     ),
 ]

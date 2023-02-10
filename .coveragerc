@@ -6,10 +6,10 @@ plugins =
 [report]
 omit =
     *site-packages*
-    *tests*
+    */tests/*
     *.tox*
-   *migrations*,
-include = plans_paypal*
+   */migrations/*,
+include = plans_paypal/*
 show_missing = True
 exclude_lines =
     raise NotImplementedError

@@ -21,16 +21,24 @@ INSTALLED_APPS = [
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sites",
+    "django.contrib.sessions",
+    "django.contrib.messages",
     "plans",
     "paypal.standard.ipn",
     "plans_paypal",
+    "tests",
 ]
 
 SITE_ID = 1
 
 PAYPAL_BUSSINESS_EMAIL = "fake@email.com"
 
-MIDDLEWARE = ("author.middlewares.AuthorDefaultBackendMiddleware",)
+MIDDLEWARE = (
+    "author.middlewares.AuthorDefaultBackendMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+)
 
 TEMPLATES = [
     {
