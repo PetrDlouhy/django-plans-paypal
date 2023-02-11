@@ -3,6 +3,10 @@
 History
 -------
 
+0.5.1 (2023-02-11)
++++++++++++++++++++
+* allow only logged users to access the failure view
+
 0.5.0 (2022-12-14)
 +++++++++++++++++++
 
