@@ -23,6 +23,7 @@ INSTALLED_APPS = [
     "django.contrib.sites",
     "django.contrib.sessions",
     "django.contrib.messages",
+    "sequences.apps.SequencesConfig",
     "plans",
     "paypal.standard.ipn",
     "plans_paypal",
