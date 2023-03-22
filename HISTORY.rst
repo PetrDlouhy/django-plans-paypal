@@ -3,6 +3,10 @@
 History
 -------
 
+0.6.0 (2023-03-22)
++++++++++++++++++++
+* Fix amount received on recurring payments, add tests
+
 0.5.1 (2023-02-11)
 +++++++++++++++++++
 * allow only logged users to access the failure view
