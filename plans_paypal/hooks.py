@@ -87,6 +87,16 @@ def receive_ipn(sender, **kwargs):
         # ALSO: for the same reason, you need to check the amount
         # received, `custom` etc. are all what you expect or what
         # is allowed.
+        if order.total() != ipn_obj.mc_gross:
+            logger.error(
+                "Received amount doesn't match",
+                extra={
+                    "order_total": order.total,
+                    "ipn_amount": ipn_obj.mc_gross,
+                    "ipn_obj": ipn_obj,
+                },
+            )
+            raise Exception("Received amount doesn't match")
 
         # Undertake some action depending upon `ipn_obj`.
         if order.status != Order.STATUS.NEW:
@@ -94,7 +104,7 @@ def receive_ipn(sender, **kwargs):
                 user=user_plan.user,
                 plan=user_plan.plan,
                 pricing=order.pricing,
-                amount=ipn_obj.mc_gross,
+                amount=order.amount,
                 tax=order.tax,
                 currency=ipn_obj.mc_currency,
             )

@@ -22,8 +22,8 @@ jobs:
         
     strategy:
       matrix:
-        DJANGO_VERSION: [ '2.2.*', '3.0.*', '3.1.*', '3.2.*', '4.0.*', '4.1.*']
-        python-version: ['3.7', '3.8', '3.9', '3.10']
+        DJANGO_VERSION: ['3.1.*', '3.2.*', '4.0.*', '4.1.*']
+        python-version: ['3.7', '3.8', '3.9', '3.10', '3.11']
         exclude:
           - DJANGO_VERSION: '4.1.*'
             python-version: '3.7'
@@ -31,10 +31,12 @@ jobs:
             python-version: '3.7'
           - DJANGO_VERSION: '3.1.*'
             python-version: '3.10'
-          - DJANGO_VERSION: '3.0.*'
-            python-version: '3.10'
-          - DJANGO_VERSION: '2.2.*'
-            python-version: '3.10'
+          - DJANGO_VERSION: '3.1.*'
+            python-version: '3.11'
+          - DJANGO_VERSION: '3.2.*'
+            python-version: '3.11'
+          - DJANGO_VERSION: '4.0.*'
+            python-version: '3.11'
 
       fail-fast: false
     steps:
@@ -48,11 +50,6 @@ jobs:
         with:
           path: ~/.cache/pip
           key: ${{ hashFiles('setup.py') }}-${{ hashFiles('requirements_test.txt') }}-${{ hashFiles('requirements.txt') }}-${{ matrix.DJANGO_VERSION }}
-      - name: Install
-        run: |
-           pip install "setuptools<58"
-           pip install -e . "setuptools<58"
-          # TODO: drop the setuptools constraint once MR #154 and #149 are released
       - name: Install requirements
         run: |
            pip install --upgrade --upgrade-strategy eager -r requirements.txt

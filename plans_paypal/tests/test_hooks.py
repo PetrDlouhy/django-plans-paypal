@@ -1,10 +1,10 @@
 from decimal import Decimal
 from unittest.mock import patch
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from model_bakery import baker
 from paypal.standard.models import ST_PP_COMPLETED
-from plans.models import Order
+from plans.models import Invoice, Order
 
 from plans_paypal.hooks import parse_custom, receive_ipn
 
@@ -67,7 +67,7 @@ class HooksTests(TestCase):
     def test_receive_ipn_completed(self):
         user = baker.make("User", username="foobar")
         user_plan = baker.make("UserPlan", user=user)
-        order = baker.make("Order", user=user)
+        order = baker.make("Order", user=user, amount=100)
         order.user.save()
         pricing = baker.make("Pricing")
         ipn = baker.make(
@@ -75,6 +75,7 @@ class HooksTests(TestCase):
             txn_type="subscr_payment",
             payment_status=ST_PP_COMPLETED,
             receiver_email="fake@email.com",
+            mc_gross=100.00,
             custom="{"
             f"'first_order_id': {order.id},"
             f"'user_plan_id': {user_plan.id},"
@@ -92,7 +93,9 @@ class HooksTests(TestCase):
         """
         user = baker.make("User", username="foobar")
         user_plan = baker.make("UserPlan", user=user)
-        order = baker.make("Order", user=user, status=Order.STATUS.COMPLETED)
+        order = baker.make(
+            "Order", user=user, status=Order.STATUS.COMPLETED, amount=100
+        )
         order.user.save()
         pricing = baker.make("Pricing")
         ipn = baker.make(
@@ -100,6 +103,7 @@ class HooksTests(TestCase):
             txn_type="subscr_payment",
             payment_status=ST_PP_COMPLETED,
             receiver_email="fake@email.com",
+            mc_gross=100.00,
             custom="{"
             f"'first_order_id': {order.id},"
             f"'user_plan_id': {user_plan.id},"
@@ -110,11 +114,65 @@ class HooksTests(TestCase):
         self.assertEqual(paypal_payment.paypal_ipn, ipn)
         self.assertNotEqual(paypal_payment.order, order)
 
+    @override_settings(
+        PLANS_INVOICE_ISSUER={
+            "issuer_name": "Foo bar company",
+            "issuer_street": "Foo",
+            "issuer_city": "Bar",
+            "issuer_zipcode": "12345",
+            "issuer_country": "CZ",
+            "issuer_tax_number": "CZ 12345678",
+        }
+    )
     def test_receive_ipn_renewal(self):
         """
         When a new IPN is received, new order need to be created
         based on the recurring plan.
-        The tax, amount should be taken from the IPN, tax from the original order.
+        The amount should be taken from the IPN, tax from the original order.
+        """
+        user = baker.make("User", username="foobar")
+        user_plan = baker.make("UserPlan", user=user)
+        baker.make("RecurringUserPlan", user_plan=user_plan)
+        order = baker.make(
+            "Order", user=user, status=Order.STATUS.COMPLETED, tax=12, amount=100
+        )
+        baker.make("BillingInfo", user=user)
+        order.user.save()
+        pricing = baker.make("Pricing")
+        ipn = baker.make(
+            "PayPalIPN",
+            txn_type="subscr_payment",
+            payment_status=ST_PP_COMPLETED,
+            receiver_email="fake@email.com",
+            mc_gross=112.00,
+            custom="{"
+            f"'first_order_id': {order.id},"
+            f"'user_plan_id': {user_plan.id},"
+            f"'pricing_id': {pricing.id},"
+            "}",
+        )
+        paypal_payment = receive_ipn(ipn)
+        self.assertEqual(paypal_payment.paypal_ipn, ipn)
+        self.assertEqual(Order.objects.count(), 2)
+        self.assertNotEqual(paypal_payment.order, order)
+        self.assertEqual(paypal_payment.order.amount, 100.00)
+        self.assertEqual(paypal_payment.order.tax, 12.0)
+        self.assertEqual(paypal_payment.order.total(), 112.00)
+        user.userplan.refresh_from_db()
+        new_recurring_plan = user.userplan.recurring
+        self.assertEqual(new_recurring_plan.amount, Decimal("100.00"))
+        self.assertEqual(new_recurring_plan.tax, 12.0)
+        invoice = Invoice.objects.get(type=Invoice.INVOICE_TYPES.INVOICE)
+        self.assertEqual(invoice.total, 112.00)
+        self.assertEqual(invoice.total_net, 100.00)
+        self.assertEqual(invoice.tax_total, 12.0)
+        self.assertEqual(invoice.tax, 12.0)
+
+    def test_receive_ipn_renewal_wrong_amount(self):
+        """
+        When a new IPN is received, new order need to be created
+        based on the recurring plan.
+        Test that error is raised when the amount is different from the original order.
         """
         user = baker.make("User", username="foobar")
         user_plan = baker.make("UserPlan", user=user)
@@ -136,16 +194,8 @@ class HooksTests(TestCase):
             f"'pricing_id': {pricing.id},"
             "}",
         )
-        paypal_payment = receive_ipn(ipn)
-        self.assertEqual(paypal_payment.paypal_ipn, ipn)
-        self.assertEqual(Order.objects.count(), 2)
-        self.assertNotEqual(paypal_payment.order, order)
-        self.assertEqual(paypal_payment.order.amount, 123.45)
-        self.assertEqual(paypal_payment.order.tax, 12.0)
-        user.userplan.refresh_from_db()
-        new_recurring_plan = user.userplan.recurring
-        self.assertEqual(new_recurring_plan.amount, Decimal("123.45"))
-        self.assertEqual(new_recurring_plan.tax, 12.0)
+        with self.assertRaisesRegex(Exception, "Received amount doesn't match"):
+            receive_ipn(ipn)
 
     def test_receive_ipn_cancellation(self):
         """
