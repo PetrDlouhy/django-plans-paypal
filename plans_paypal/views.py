@@ -63,6 +63,7 @@ def view_that_asks_for_money(request, order_id, sandbox=False):
         "t3": duration_unit,  # duration unit ("M for Month")
         "src": "1",  # make payments recur
         "sra": "1",  # reattempt payment on payment error
+        "srt": "52",  # reattempt count
         "no_note": "1",  # remove extra notes (optional)
         "item_name": f"{order.name} Order ID: {order.pk}",
         "notify_url": request.build_absolute_uri(reverse("paypal-ipn")),
