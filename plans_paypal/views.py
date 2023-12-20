@@ -116,5 +116,7 @@ class PaymentFailureView(LoginRequiredMixin, View):
     def get(self, request, *args, order_id=None, payment_variant=None):
         order = get_object_or_404(Order, pk=order_id, user=request.user)
         order.status = Order.STATUS.CANCELED
+        # In case django-simple-history is installed
+        order._change_reason = "Django-payments-paypal: Payment failed by cancel view"
         order.save()
         return redirect(reverse("order_payment_failure", kwargs={"pk": order_id}))
