@@ -46,6 +46,8 @@ class HooksTests(TestCase):
         mock_logger.error.assert_called_with(
             "IPN with unknown status", extra={"ipn_obj": ipn, "ipn_status": ""}
         )
+        user_plan.refresh_from_db()
+        self.assertFalse(hasattr(user_plan, "recurring"))
 
     def test_receive_ipn_completed_email_does_not_match(self):
         user_plan = baker.make("UserPlan")
@@ -63,6 +65,8 @@ class HooksTests(TestCase):
             Exception, "Returned email doesn't match: '' != 'fake@email.com'"
         ):
             receive_ipn(ipn)
+        user_plan.refresh_from_db()
+        self.assertFalse(hasattr(user_plan, "recurring"))
 
     def test_receive_ipn_completed(self):
         user = baker.make("User", username="foobar")
@@ -85,6 +89,13 @@ class HooksTests(TestCase):
         paypal_payment = receive_ipn(ipn)
         self.assertEqual(paypal_payment.paypal_ipn, ipn)
         self.assertEqual(paypal_payment.order, order)
+        user.userplan.refresh_from_db()
+        self.assertEqual(user.userplan.recurring.amount, Decimal("100.00"))
+        self.assertIsNone(user.userplan.recurring.tax)
+        self.assertEqual(user.userplan.recurring.token, "")
+        self.assertEqual(user.userplan.recurring.payment_provider, "paypal-recurring")
+        self.assertTrue(user.userplan.recurring.has_automatic_renewal)
+        self.assertTrue(user.userplan.recurring.token_verified)
 
     def test_receive_ipn_completed_order_completed(self):
         """
@@ -113,6 +124,13 @@ class HooksTests(TestCase):
         paypal_payment = receive_ipn(ipn)
         self.assertEqual(paypal_payment.paypal_ipn, ipn)
         self.assertNotEqual(paypal_payment.order, order)
+        user.userplan.refresh_from_db()
+        self.assertEqual(user.userplan.recurring.amount, Decimal("100.00"))
+        self.assertIsNone(user.userplan.recurring.tax)
+        self.assertEqual(user.userplan.recurring.token, "")
+        self.assertEqual(user.userplan.recurring.payment_provider, "paypal-recurring")
+        self.assertTrue(user.userplan.recurring.has_automatic_renewal)
+        self.assertTrue(user.userplan.recurring.token_verified)
 
     @override_settings(
         PLANS_INVOICE_ISSUER={
@@ -162,6 +180,10 @@ class HooksTests(TestCase):
         new_recurring_plan = user.userplan.recurring
         self.assertEqual(new_recurring_plan.amount, Decimal("100.00"))
         self.assertEqual(new_recurring_plan.tax, 12.0)
+        self.assertEqual(new_recurring_plan.token, "")
+        self.assertEqual(new_recurring_plan.payment_provider, "paypal-recurring")
+        self.assertTrue(new_recurring_plan.has_automatic_renewal)
+        self.assertTrue(new_recurring_plan.token_verified)
         invoice = Invoice.objects.get(type=Invoice.INVOICE_TYPES.INVOICE)
         self.assertEqual(invoice.total, 112.00)
         self.assertEqual(invoice.total_net, 100.00)
@@ -196,6 +218,13 @@ class HooksTests(TestCase):
         )
         with self.assertRaisesRegex(Exception, "Received amount doesn't match"):
             receive_ipn(ipn)
+        user.userplan.refresh_from_db()
+        self.assertIsNone(user.userplan.recurring.amount)
+        self.assertIsNone(user.userplan.recurring.tax)
+        self.assertIsNone(user.userplan.recurring.token)
+        self.assertIsNone(user.userplan.recurring.payment_provider)
+        self.assertFalse(user.userplan.recurring.has_automatic_renewal)
+        self.assertFalse(user.userplan.recurring.token_verified)
 
     def test_receive_ipn_cancellation(self):
         """
