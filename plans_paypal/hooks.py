@@ -4,6 +4,7 @@ import logging
 from django.conf import settings
 from paypal.standard.ipn.signals import valid_ipn_received
 from paypal.standard.models import ST_PP_COMPLETED, ST_PP_PENDING
+from plans.base.models import AbstractRecurringUserPlan
 from plans.models import Order
 
 from .models import PayPalPayment
@@ -113,7 +114,7 @@ def receive_ipn(sender, **kwargs):
             token=ipn_obj.subscr_id,
             payment_provider="paypal-recurring"
             + ("-sandbox" if ipn_obj.test_ipn else ""),
-            has_automatic_renewal=True,
+            renewal_triggered_by=AbstractRecurringUserPlan.RENEWAL_TRIGGERED_BY.OTHER,
             token_verified=True,
         )
         paypal_payment = PayPalPayment.objects.create(
