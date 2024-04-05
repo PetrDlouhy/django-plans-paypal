@@ -4,6 +4,7 @@ from unittest.mock import patch
 from django.test import TestCase, override_settings
 from model_bakery import baker
 from paypal.standard.models import ST_PP_COMPLETED
+from plans.base.models import AbstractRecurringUserPlan
 from plans.models import Invoice, Order
 
 from plans_paypal.hooks import parse_custom, receive_ipn
@@ -94,7 +95,10 @@ class HooksTests(TestCase):
         self.assertIsNone(user.userplan.recurring.tax)
         self.assertEqual(user.userplan.recurring.token, "")
         self.assertEqual(user.userplan.recurring.payment_provider, "paypal-recurring")
-        self.assertTrue(user.userplan.recurring.has_automatic_renewal)
+        self.assertEqual(
+            user.userplan.recurring.renewal_triggered_by,
+            AbstractRecurringUserPlan.RENEWAL_TRIGGERED_BY.OTHER,
+        )
         self.assertTrue(user.userplan.recurring.token_verified)
 
     def test_receive_ipn_completed_order_completed(self):
@@ -129,7 +133,10 @@ class HooksTests(TestCase):
         self.assertIsNone(user.userplan.recurring.tax)
         self.assertEqual(user.userplan.recurring.token, "")
         self.assertEqual(user.userplan.recurring.payment_provider, "paypal-recurring")
-        self.assertTrue(user.userplan.recurring.has_automatic_renewal)
+        self.assertEqual(
+            user.userplan.recurring.renewal_triggered_by,
+            AbstractRecurringUserPlan.RENEWAL_TRIGGERED_BY.OTHER,
+        )
         self.assertTrue(user.userplan.recurring.token_verified)
 
     @override_settings(
@@ -182,7 +189,10 @@ class HooksTests(TestCase):
         self.assertEqual(new_recurring_plan.tax, 12.0)
         self.assertEqual(new_recurring_plan.token, "")
         self.assertEqual(new_recurring_plan.payment_provider, "paypal-recurring")
-        self.assertTrue(new_recurring_plan.has_automatic_renewal)
+        self.assertEqual(
+            new_recurring_plan.renewal_triggered_by,
+            AbstractRecurringUserPlan.RENEWAL_TRIGGERED_BY.OTHER,
+        )
         self.assertTrue(new_recurring_plan.token_verified)
         invoice = Invoice.objects.get(type=Invoice.INVOICE_TYPES.INVOICE)
         self.assertEqual(invoice.total, 112.00)
@@ -223,7 +233,10 @@ class HooksTests(TestCase):
         self.assertIsNone(user.userplan.recurring.tax)
         self.assertIsNone(user.userplan.recurring.token)
         self.assertIsNone(user.userplan.recurring.payment_provider)
-        self.assertFalse(user.userplan.recurring.has_automatic_renewal)
+        self.assertEqual(
+            user.userplan.recurring.renewal_triggered_by,
+            AbstractRecurringUserPlan.RENEWAL_TRIGGERED_BY.USER,
+        )
         self.assertFalse(user.userplan.recurring.token_verified)
 
     def test_receive_ipn_cancellation(self):
