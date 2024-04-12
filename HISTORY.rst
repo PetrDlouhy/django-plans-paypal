@@ -3,7 +3,7 @@
 History
 -------
 
-0.7.0 (xxxx-xx-xx)
+0.7.0 (2024-04-12)
 ++++++++++++++++++
 * migrate code to RecurringUserPlan.renewal_triggered_by
 * migrate data of RecurringUserPlans with payment_provider="paypal-recurring" and renewal_triggered_by=TASK to renewal_triggered_by=OTHER
