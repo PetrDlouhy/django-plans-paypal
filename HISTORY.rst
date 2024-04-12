@@ -3,6 +3,11 @@
 History
 -------
 
+0.7.0 (xxxx-xx-xx)
+++++++++++++++++++
+* migrate code to RecurringUserPlan.renewal_triggered_by
+* migrate data of RecurringUserPlans with payment_provider="paypal-recurring" and renewal_triggered_by=TASK to renewal_triggered_by=OTHER
+
 0.6.0 (2023-03-22)
 +++++++++++++++++++
 * Fix amount received on recurring payments, add tests
