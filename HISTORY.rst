@@ -3,7 +3,7 @@
 History
 -------
 
-0.7.1 (xxxx-xx-xx)
+0.7.1 (2024-04-23)
 ++++++++++++++++++
 * fail if PaymentFailureView is requested on completed orders
 
