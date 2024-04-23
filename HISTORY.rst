@@ -3,6 +3,10 @@
 History
 -------
 
+0.7.1 (xxxx-xx-xx)
+++++++++++++++++++
+* fail if PaymentFailureView is requested on completed orders
+
 0.7.0 (2024-04-12)
 ++++++++++++++++++
 * migrate code to RecurringUserPlan.renewal_triggered_by

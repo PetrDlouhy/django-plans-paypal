@@ -115,6 +115,9 @@ def view_that_asks_for_money(request, order_id, sandbox=False):
 class PaymentFailureView(LoginRequiredMixin, View):
     def get(self, request, *args, order_id=None, payment_variant=None):
         order = get_object_or_404(Order, pk=order_id, user=request.user)
+        # This view is meant to cancel the order before it is completed.
+        if order.status == Order.STATUS.COMPLETED:
+            raise ValueError(f"Invalid order status: {order.status}")
         order.status = Order.STATUS.CANCELED
         # In case django-simple-history is installed
         order._change_reason = "Django-payments-paypal: Payment failed by cancel view"

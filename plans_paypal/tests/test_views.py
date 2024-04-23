@@ -27,6 +27,14 @@ class PaymentFailureViewTests(TestCase):
         response = self.client.get(reverse("paypal-payment-failure", args=[1]))
         self.assertEqual(response.status_code, 404)
 
+    def test_payment_failure_view_order_completed(self):
+        order = baker.make(Order, status=Order.STATUS.COMPLETED)
+        self.client.force_login(order.user)
+        with self.assertRaisesRegex(ValueError, r"^Invalid order status: 2"):
+            self.client.get(reverse("paypal-payment-failure", args=[order.id]))
+        order.refresh_from_db()
+        self.assertEqual(order.status, Order.STATUS.COMPLETED)
+
     def test_payment_failure_view_not_logged_in(self):
         order = baker.make(Order, user=baker.make("User"))
         response = self.client.get(reverse("paypal-payment-failure", args=[order.id]))
