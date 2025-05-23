@@ -123,6 +123,7 @@ class HooksTests(TestCase):
             f"'first_order_id': {order.id},"
             f"'user_plan_id': {user_plan.id},"
             f"'pricing_id': {pricing.id},"
+            f"'plan_id': {order.plan.id},"
             "}",
         )
         paypal_payment = receive_ipn(ipn)
@@ -174,6 +175,7 @@ class HooksTests(TestCase):
             f"'first_order_id': {order.id},"
             f"'user_plan_id': {user_plan.id},"
             f"'pricing_id': {pricing.id},"
+            f"'plan_id': {order.plan.id},"
             "}",
         )
         paypal_payment = receive_ipn(ipn)
