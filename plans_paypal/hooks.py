@@ -5,7 +5,7 @@ from django.conf import settings
 from paypal.standard.ipn.signals import valid_ipn_received
 from paypal.standard.models import ST_PP_COMPLETED, ST_PP_PENDING
 from plans.base.models import AbstractRecurringUserPlan
-from plans.models import Order
+from plans.models import Order, Plan, Pricing
 
 from .models import PayPalPayment
 
@@ -18,24 +18,58 @@ def parse_custom(custom):
     return ast.literal_eval(custom)
 
 
-def get_order_id(ipn_obj):
+def get_custom_data(ipn_obj):
     try:
-        custom = parse_custom(ipn_obj.custom)
-        return custom["first_order_id"]
+        return parse_custom(ipn_obj.custom)
     except SyntaxError:
-        logger.error(
+        logger.exception(
             "Can't parse custom data",
             extra={
                 "custom_data": ipn_obj.custom,
                 "ipn_obj": ipn_obj,
             },
         )
-        return ipn_obj.item_number
+        return {"first_order_id": ipn_obj.item_number}
+
+
+def create_new_order(order, user_plan, ipn_obj, custom_ipn_data):
+    """
+    Create order for automatic plan renewal (create new order)
+
+    This could also happen if the original order was canceled.
+    In that case we want to create new order.
+    """
+    try:
+        plan = Plan.objects.get(pk=custom_ipn_data["plan_id"])
+        pricing = Pricing.objects.get(pk=custom_ipn_data["pricing_id"])
+    except (Plan.DoesNotExist, AttributeError):
+        plan = user_plan.plan
+        pricing = user_plan.pricing
+        logger.exception(
+            "Plan or pricing not found in custom data",
+            extra={
+                "custom_data": custom_ipn_data,
+                "ipn_obj": ipn_obj,
+            },
+        )
+
+    return Order.objects.create(
+        user=user_plan.user,
+        plan=plan,
+        pricing=pricing,
+        amount=order.amount,
+        tax=order.tax,
+        currency=ipn_obj.mc_currency,
+    )
 
 
 def receive_ipn(sender, **kwargs):
     print("paypal hook")
     ipn_obj = sender
+
+    custom_ipn_data = get_custom_data(ipn_obj)
+    first_order_id = custom_ipn_data["first_order_id"]
+
     print("Payment status: ", ipn_obj.payment_status)
     print(ipn_obj.receiver_email)
     print(ipn_obj.txn_type)
@@ -46,7 +80,7 @@ def receive_ipn(sender, **kwargs):
         # Not a subscription
         return None
 
-    order = Order.objects.get(pk=get_order_id(ipn_obj))
+    order = Order.objects.get(pk=first_order_id)
     print("Order: ", order.id)
     user_plan = order.user.userplan
 
@@ -55,8 +89,8 @@ def receive_ipn(sender, **kwargs):
             if str(user_plan.recurring.token) == str(ipn_obj.subscr_id):
                 user_plan.recurring.delete()
             else:
-                logger.warning(
-                    "Recurring user plan not found by ID, can't cancell subscription",
+                logger.error(
+                    "Recurring user plan not found by ID, can't cancel subscription",
                     extra={
                         "recurring_token": user_plan.recurring.token,
                         "ipn_token": ipn_obj.subscr_id,
@@ -101,14 +135,7 @@ def receive_ipn(sender, **kwargs):
 
         # Undertake some action depending upon `ipn_obj`.
         if order.status != Order.STATUS.NEW:
-            order = Order.objects.create(
-                user=user_plan.user,
-                plan=user_plan.plan,
-                pricing=order.pricing,
-                amount=order.amount,
-                tax=order.tax,
-                currency=ipn_obj.mc_currency,
-            )
+            order = create_new_order(order, user_plan, ipn_obj, custom_ipn_data)
         user_plan.set_plan_renewal(
             order,
             token=ipn_obj.subscr_id,
