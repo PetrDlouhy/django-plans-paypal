@@ -3,6 +3,12 @@
 History
 -------
 
+1.0.0 (2025-05-23)
+++++++++++++++++++
+
+* create order more robust: take the data from custom_data
+* Support Django up to 5.2
+
 0.7.1 (2024-04-23)
 ++++++++++++++++++
 * fail if PaymentFailureView is requested on completed orders
