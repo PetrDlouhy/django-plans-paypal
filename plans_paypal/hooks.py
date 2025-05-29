@@ -42,9 +42,9 @@ def create_new_order(order, user_plan, ipn_obj, custom_ipn_data):
     try:
         plan = Plan.objects.get(pk=custom_ipn_data["plan_id"])
         pricing = Pricing.objects.get(pk=custom_ipn_data["pricing_id"])
-    except (Plan.DoesNotExist, AttributeError):
+    except (Plan.DoesNotExist, KeyError):
         plan = user_plan.plan
-        pricing = user_plan.pricing
+        pricing = order.pricing
         logger.exception(
             "Plan or pricing not found in custom data",
             extra={
