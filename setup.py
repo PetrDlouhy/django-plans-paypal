@@ -69,7 +69,13 @@ setup(
     author="Petr Dlouhý",
     author_email="petr.dlouhy@email.cz",
     url="https://github.com/PetrDlouhy/django-plans-paypal",
-    packages=find_packages(),
+    packages=find_packages(
+        exclude=[
+            "tests.templates",
+            "plans_paypal.templates.paypal_payments",
+            "plans_paypal.templates",
+        ]
+    ),
     include_package_data=True,
     install_requires=parse_requirements("requirements.txt"),
     license="MIT",
@@ -80,10 +86,7 @@ setup(
         "Framework :: Django :: 1.11",
         "Framework :: Django :: 2.0",
         "Intended Audience :: Developers",
-        "License :: OSI Approved :: BSD License",
         "Natural Language :: English",
-        "Programming Language :: Python :: 2",
-        "Programming Language :: Python :: 2.7",
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.4",
         "Programming Language :: Python :: 3.5",
