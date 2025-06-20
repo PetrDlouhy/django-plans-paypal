@@ -11,6 +11,9 @@ class PayPalPaymentAdmin(admin.ModelAdmin):
         "paypal_ipn",
         "paypal_status",
         "paypal_email",
+        "order__amount",
+        "paypal_ipn__mc_gross",
+        "paypal_ipn__mc_fee",
         "created",
     )
     autocomplete_fields = (
