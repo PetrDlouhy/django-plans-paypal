@@ -1,4 +1,5 @@
 import json
+import logging
 
 from django.conf import settings
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -7,6 +8,8 @@ from django.urls import reverse
 from django.views.generic import View
 from paypal.standard.forms import PayPalEncryptedPaymentsForm, PayPalPaymentsForm
 from plans.models import Order
+
+logger = logging.getLogger(__name__)
 
 
 class PlansPayPalPaymentsFormMixin:
@@ -115,9 +118,18 @@ def view_that_asks_for_money(request, order_id, sandbox=False):
 class PaymentFailureView(LoginRequiredMixin, View):
     def get(self, request, *args, order_id=None, payment_variant=None):
         order = get_object_or_404(Order, pk=order_id, user=request.user)
-        # This view is meant to cancel the order before it is completed.
+        # This view is the PayPal ``cancel_return`` landing page. A completed
+        # order means the IPN already confirmed payment before the user reached
+        # us (browser back button, stale tab refresh, or PayPal sending the
+        # buyer here after a successful payment). Cancelling a paid order would
+        # be wrong, so send the user to the success page instead.
         if order.status == Order.STATUS.COMPLETED:
-            raise ValueError(f"Invalid order status: {order.status}")
+            logger.warning(
+                "PaymentFailureView reached for already-completed order %s; "
+                "redirecting to success page.",
+                order.pk,
+            )
+            return redirect(reverse("order_payment_success", kwargs={"pk": order_id}))
         order.status = Order.STATUS.CANCELED
         # In case django-simple-history is installed
         order._change_reason = "Django-payments-paypal: Payment failed by cancel view"

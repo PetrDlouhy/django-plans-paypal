@@ -28,12 +28,30 @@ class PaymentFailureViewTests(TestCase):
         self.assertEqual(response.status_code, 404)
 
     def test_payment_failure_view_order_completed(self):
+        """Already-completed orders redirect to success, not failure.
+
+        PayPal can send the buyer to ``cancel_return`` even after the IPN has
+        marked the order as completed (browser back button, stale tabs, or
+        edge cases in the PayPal flow). The view must not 500 in that case
+        and must not flip a paid order to ``CANCELED``.
+        """
         order = baker.make(Order, status=Order.STATUS.COMPLETED)
         self.client.force_login(order.user)
-        with self.assertRaisesRegex(ValueError, r"^Invalid order status: 2"):
-            self.client.get(reverse("paypal-payment-failure", args=[order.id]))
+        with self.assertLogs("plans_paypal.views", level="WARNING") as cm:
+            response = self.client.get(
+                reverse("paypal-payment-failure", args=[order.id])
+            )
+        self.assertRedirects(
+            response,
+            reverse("order_payment_success", args=[order.id]),
+            target_status_code=302,
+        )
         order.refresh_from_db()
         self.assertEqual(order.status, Order.STATUS.COMPLETED)
+        self.assertTrue(
+            any("already-completed order" in m for m in cm.output),
+            cm.output,
+        )
 
     def test_payment_failure_view_not_logged_in(self):
         order = baker.make(Order, user=baker.make("User"))
