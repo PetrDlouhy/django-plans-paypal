@@ -6,7 +6,6 @@ import sys
 
 from setuptools import find_packages
 
-
 try:
     from setuptools import setup
 except ImportError:

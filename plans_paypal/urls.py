@@ -2,7 +2,6 @@ from django.urls import include, path
 
 from . import views
 
-
 urlpatterns = [
     path(
         "paypal-payment/<int:order_id>/",
