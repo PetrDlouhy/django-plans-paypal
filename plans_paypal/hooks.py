@@ -9,7 +9,6 @@ from plans.models import Order, Plan, Pricing
 
 from .models import PayPalPayment
 
-
 logger = logging.getLogger(__name__)
 
 
