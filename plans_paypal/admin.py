@@ -8,6 +8,7 @@ class PayPalPaymentAdmin(admin.ModelAdmin):
     list_display = (
         "order",
         "user_plan",
+        "paypal_ipn__txn_id",
         "paypal_ipn",
         "paypal_status",
         "paypal_email",
