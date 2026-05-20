@@ -3,6 +3,16 @@
 History
 -------
 
+unreleased
+++++++++++
+
+* ``PaymentFailureView``: redirect already-completed orders to the success
+  page (with a warning log) instead of raising ``ValueError``. PayPal can
+  send the buyer to the ``cancel_return`` URL even after the IPN has
+  marked the order as completed (browser back button, stale tabs, edge
+  cases in the PayPal flow); the previous behaviour produced unhandled
+  500s for paid users. Reverses the 0.7.1 behaviour change.
+
 1.1.0 (2025-06-20)
 ++++++++++++++++++
 
