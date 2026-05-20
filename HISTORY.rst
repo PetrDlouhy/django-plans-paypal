@@ -3,8 +3,8 @@
 History
 -------
 
-unreleased
-++++++++++
+1.2.0 (2026-05-20)
+++++++++++++++++++
 
 * ``PaymentFailureView``: redirect already-completed orders to the success
   page (with a warning log) instead of raising ``ValueError``. PayPal can
@@ -12,6 +12,13 @@ unreleased
   marked the order as completed (browser back button, stale tabs, edge
   cases in the PayPal flow); the previous behaviour produced unhandled
   500s for paid users. Reverses the 0.7.1 behaviour change.
+* handle empty/whitespace PayPal IPN ``custom`` data without logging an
+  error; also catch ``ValueError`` from ``ast.literal_eval`` so future
+  Python releases can't break the parser
+* admin: add ``paypal_ipn__txn_id`` column to ``PayPalPaymentAdmin.list_display``
+* drop conflicting isort ``lines_after_imports = 2`` setting (project
+  already uses ``profile = black``) and reformat affected files; the
+  ``lint`` CI job is green again
 
 1.1.0 (2025-06-20)
 ++++++++++++++++++
