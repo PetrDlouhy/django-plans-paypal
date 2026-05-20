@@ -18,9 +18,11 @@ def parse_custom(custom):
 
 
 def get_custom_data(ipn_obj):
+    if not ipn_obj.custom or not ipn_obj.custom.strip():
+        return {"first_order_id": ipn_obj.item_number}
     try:
         return parse_custom(ipn_obj.custom)
-    except SyntaxError:
+    except (SyntaxError, ValueError):
         logger.exception(
             "Can't parse custom data",
             extra={

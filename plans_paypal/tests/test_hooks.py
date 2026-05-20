@@ -7,7 +7,7 @@ from paypal.standard.models import ST_PP_COMPLETED
 from plans.base.models import AbstractRecurringUserPlan
 from plans.models import Invoice, Order
 
-from plans_paypal.hooks import parse_custom, receive_ipn
+from plans_paypal.hooks import get_custom_data, parse_custom, receive_ipn
 
 
 class HooksTests(TestCase):
@@ -15,6 +15,29 @@ class HooksTests(TestCase):
         ipn = baker.make("PayPalIPN")
         paypal_payment = receive_ipn(ipn)
         self.assertEqual(paypal_payment, None)
+
+    @patch("plans_paypal.hooks.logger")
+    def test_get_custom_data_empty_string_no_logging(self, mock_logger):
+        """Empty custom is a known PayPal pattern, should not log an error."""
+        ipn = baker.make("PayPalIPN", custom="", item_number="12345")
+        result = get_custom_data(ipn)
+        self.assertEqual(result, {"first_order_id": "12345"})
+        mock_logger.exception.assert_not_called()
+
+    @patch("plans_paypal.hooks.logger")
+    def test_get_custom_data_whitespace_no_logging(self, mock_logger):
+        ipn = baker.make("PayPalIPN", custom="  ", item_number="67890")
+        result = get_custom_data(ipn)
+        self.assertEqual(result, {"first_order_id": "67890"})
+        mock_logger.exception.assert_not_called()
+
+    @patch("plans_paypal.hooks.logger")
+    def test_get_custom_data_garbage_still_logs(self, mock_logger):
+        """Non-empty unparseable custom data should still log for investigation."""
+        ipn = baker.make("PayPalIPN", custom="not-valid-python", item_number="99999")
+        result = get_custom_data(ipn)
+        self.assertEqual(result, {"first_order_id": "99999"})
+        mock_logger.exception.assert_called_once()
 
     def test_parse_custom(self):
         self.assertEqual(
