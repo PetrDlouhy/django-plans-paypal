@@ -3,6 +3,18 @@
 History
 -------
 
+1.3.0 (2026-08-19)
+++++++++++++++++++
+
+* ``receive_ipn`` now processes each IPN in a single database
+  transaction: a failure while completing the order no longer leaves an
+  armed ``RecurringUserPlan`` and a recorded payment behind, so PayPal's
+  IPN retries start from a clean slate instead of dying on the leftover
+  state as duplicates.
+* pending subscription payments (typically eChecks clearing) are
+  recorded as ``PayPalPayment`` rows instead of being silently dropped
+  -- an in-flight payment is not a decline.
+
 1.2.0 (2026-05-20)
 ++++++++++++++++++
 
