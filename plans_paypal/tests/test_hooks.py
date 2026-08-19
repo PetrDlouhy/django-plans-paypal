@@ -92,6 +92,68 @@ class HooksTests(TestCase):
         user_plan.refresh_from_db()
         self.assertFalse(hasattr(user_plan, "recurring"))
 
+    def test_receive_ipn_pending_records_payment(self):
+        # A pending subscription payment (eCheck clearing) is in flight,
+        # not declined: it must leave a visible record, arm nothing, and
+        # complete nothing -- the follow-up COMPLETED IPN does that.
+        from paypal.standard.models import ST_PP_PENDING
+
+        from plans_paypal.models import PayPalPayment
+
+        user_plan = baker.make("UserPlan")
+        order = baker.make("Order", user=user_plan.user, amount=100)
+        ipn = baker.make(
+            "PayPalIPN",
+            txn_type="subscr_payment",
+            payment_status=ST_PP_PENDING,
+            custom="{"
+            f"'first_order_id': {order.id},"
+            f"'user_plan_id': {user_plan.id},"
+            "}",
+        )
+
+        paypal_payment = receive_ipn(ipn)
+
+        self.assertEqual(paypal_payment.paypal_ipn, ipn)
+        self.assertEqual(paypal_payment.order, order)
+        self.assertEqual(PayPalPayment.objects.count(), 1)
+        order.refresh_from_db()
+        self.assertEqual(order.status, Order.STATUS.NEW)
+        user_plan.refresh_from_db()
+        self.assertFalse(hasattr(user_plan, "recurring"))
+
+    def test_receive_ipn_completed_rolls_back_atomically(self):
+        # A failure inside complete_order() must not leave the earlier
+        # writes committed (armed RecurringUserPlan + PayPalPayment row
+        # for an uncompleted order): PayPal retries the IPN, and the
+        # leftover state made every retry die as a duplicate.
+        from plans_paypal.models import PayPalPayment
+
+        user = baker.make("User", username="foobar")
+        user_plan = baker.make("UserPlan", user=user)
+        order = baker.make("Order", user=user, amount=100)
+        pricing = baker.make("Pricing")
+        ipn = baker.make(
+            "PayPalIPN",
+            txn_type="subscr_payment",
+            payment_status=ST_PP_COMPLETED,
+            receiver_email="fake@email.com",
+            mc_gross=100.00,
+            custom="{"
+            f"'first_order_id': {order.id},"
+            f"'user_plan_id': {user_plan.id},"
+            f"'pricing_id': {pricing.id},"
+            "}",
+        )
+
+        with patch.object(Order, "complete_order", side_effect=RuntimeError("boom")):
+            with self.assertRaises(RuntimeError):
+                receive_ipn(ipn)
+
+        self.assertFalse(PayPalPayment.objects.exists())
+        user_plan.refresh_from_db()
+        self.assertFalse(hasattr(user_plan, "recurring"))
+
     def test_receive_ipn_completed(self):
         user = baker.make("User", username="foobar")
         user_plan = baker.make("UserPlan", user=user)

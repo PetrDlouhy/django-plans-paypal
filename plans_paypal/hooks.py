@@ -2,6 +2,7 @@ import ast
 import logging
 
 from django.conf import settings
+from django.db import transaction
 from paypal.standard.ipn.signals import valid_ipn_received
 from paypal.standard.models import ST_PP_COMPLETED, ST_PP_PENDING
 from plans.base.models import AbstractRecurringUserPlan
@@ -64,7 +65,13 @@ def create_new_order(order, user_plan, ipn_obj, custom_ipn_data):
     )
 
 
+@transaction.atomic
 def receive_ipn(sender, **kwargs):
+    # Atomic, because the completed branch arms the plan renewal and
+    # records the PayPalPayment BEFORE completing the order. Without a
+    # transaction, a failure inside complete_order() left those earlier
+    # writes committed: an armed RecurringUserPlan, an uncompleted order,
+    # and PayPal retrying the IPN forever as a duplicate txn_id.
     print("paypal hook")
     ipn_obj = sender
 
@@ -101,8 +108,20 @@ def receive_ipn(sender, **kwargs):
                 )
         return None
     elif ipn_obj.is_subscription_payment() and ipn_obj.payment_status == ST_PP_PENDING:
-        # Pending status
-        return None
+        # A pending subscription payment (typically an eCheck clearing) is
+        # a payment in flight, not a failure. Dropping it made the attempt
+        # invisible -- support would read the subscription as declined and
+        # tell the customer to re-subscribe, and PayPal then billed both
+        # subscriptions. Record the attempt; the follow-up COMPLETED IPN
+        # for the same transaction completes the order as usual.
+        logger.info(
+            "Pending subscription payment (e.g. eCheck) recorded for order %s",
+            order.pk,
+            extra={"ipn_obj": ipn_obj},
+        )
+        return PayPalPayment.objects.create(
+            paypal_ipn=ipn_obj, user_plan=user_plan, order=order
+        )
     elif (
         ipn_obj.is_subscription_payment() and ipn_obj.payment_status == ST_PP_COMPLETED
     ):
