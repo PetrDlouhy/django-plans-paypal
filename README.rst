@@ -8,8 +8,8 @@ Django plans paypal
 .. image:: https://github.com/PetrDlouhy/django-plans-paypal/actions/workflows/main.yml/badge.svg
     :target: https://github.com/PetrDlouhy/django-plans-paypal/actions/workflows/main.yml
 
-.. image:: https://coveralls.io/repos/github/PetrDlouhy/django-plans-paypal/badge.svg?branch=master
-    :target: https://coveralls.io/github/PetrDlouhy/django-plans-paypal?branch=master
+.. image:: https://codecov.io/gh/PetrDlouhy/django-plans-paypal/branch/master/graph/badge.svg
+    :target: https://codecov.io/gh/PetrDlouhy/django-plans-paypal
 
 Almost automatic integration between `django-plans <https://github.com/django-getpaid/django-plans>`_ and `django-paypal <https://github.com/spookylukey/django-paypal>`_.
 This will add subscribe buttons to the order page and automatically confirm the `Order` after the payment.
