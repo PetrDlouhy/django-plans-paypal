@@ -17,6 +17,7 @@ DATABASES = {
 ROOT_URLCONF = "tests.urls"
 
 INSTALLED_APPS = [
+    "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sites",
@@ -30,6 +31,8 @@ INSTALLED_APPS = [
 ]
 
 SITE_ID = 1
+
+STATIC_URL = "/static/"
 
 PAYPAL_BUSSINESS_EMAIL = "fake@email.com"
 

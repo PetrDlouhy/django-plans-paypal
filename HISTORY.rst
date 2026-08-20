@@ -6,9 +6,27 @@ History
 unreleased
 ++++++++++
 
+* admin: ``PayPalPaymentAdmin`` now extends ``RelatedFieldAdmin`` - the
+  ``__`` paths in ``list_display`` only work on plain ``ModelAdmin``
+  since Django 5.1, so the admin was broken on Django 4.2/5.0
+* debug ``print()`` calls removed from the IPN hook and the payment
+  view (the view printed the full payment dict incl. customer e-mail
+  into logs on every order page view); the hook logs a single
+  ``logger.debug`` line instead
+* tests: admin (system checks + changelist), IPN with empty ``custom``
+  data, cancellation with a foreign ``subscr_id``, PayPal duration-unit
+  selection and sandbox-flag isolation of the payment form (coverage
+  84 % -> 93 %)
+* release tooling: ``make release``/``make sdist`` use ``build`` +
+  ``twine`` (``setup.py sdist upload`` has been dead on PyPI for
+  years), the broken ``setup.py publish`` shortcut and the stale
+  ``.travis.yml`` are gone
 * CI: test matrix updated to Django 4.2-5.2 on Python 3.9-3.13 (dropped
   EOL Django 3.2-4.1 and Python 3.8), GitHub Actions bumped to current
-  versions, coverage reporting moved from Codecov to Coveralls
+  versions
+* CI: Codecov upload repaired - the deprecated ``codecov`` CLI uploader
+  has been dead since 2023 (uploads failed silently, so no reports or
+  PR comments appeared); now ``codecov-action@v5`` with OIDC
 * packaging: classifiers and ``python_requires`` reflect the supported
   versions
 * renewal orders recalculate the tax rate for the user's current billing
