@@ -90,8 +90,6 @@ def view_that_asks_for_money(request, order_id, sandbox=False):
 
     paypal_dict["custom"] = paypal_dict["custom"][:255]
 
-    print(paypal_dict)
-
     # Create the instance.
     form_kwargs = {}
     if getattr(settings, "PAYPAL_ENCRYPTED_FORM", False):

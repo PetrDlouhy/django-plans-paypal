@@ -143,15 +143,17 @@ def receive_ipn(sender, **kwargs):
     # transaction, a failure inside complete_order() left those earlier
     # writes committed: an armed RecurringUserPlan, an uncompleted order,
     # and PayPal retrying the IPN forever as a duplicate txn_id.
-    print("paypal hook")
     ipn_obj = sender
 
     custom_ipn_data = get_custom_data(ipn_obj)
     first_order_id = custom_ipn_data["first_order_id"]
 
-    print("Payment status: ", ipn_obj.payment_status)
-    print(ipn_obj.receiver_email)
-    print(ipn_obj.txn_type)
+    logger.debug(
+        "PayPal IPN received: txn_type=%s payment_status=%s first_order_id=%s",
+        ipn_obj.txn_type,
+        ipn_obj.payment_status,
+        first_order_id,
+    )
 
     if not (
         ipn_obj.is_subscription_cancellation() or ipn_obj.is_subscription_payment()
@@ -160,7 +162,6 @@ def receive_ipn(sender, **kwargs):
         return None
 
     order = Order.objects.get(pk=first_order_id)
-    print("Order: ", order.id)
     user_plan = order.user.userplan
 
     if ipn_obj.is_subscription_cancellation():
@@ -200,7 +201,6 @@ def receive_ipn(sender, **kwargs):
         # Check that the receiver email is the same we previously
         # set on the `business` field. (The user could tamper with
         # that fields on the payment form before it goes to PayPal)
-        print(ipn_obj.receiver_email)
         bussiness_email = settings.PAYPAL_BUSSINESS_EMAIL
         if ipn_obj.test_ipn:
             bussiness_email = settings.PAYPAL_TEST_BUSSINESS_EMAIL

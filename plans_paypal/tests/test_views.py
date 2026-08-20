@@ -1,7 +1,43 @@
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from model_bakery import baker
 from plans.models import Order
+
+from plans_paypal.views import PlansPayPalPaymentsForm
+
+
+class PaymentFormViewTests(TestCase):
+    def _get_payment_page(self, days):
+        user = baker.make("User")
+        baker.make("UserPlan", user=user)
+        pricing = baker.make("Pricing", period=days)
+        plan_pricing = baker.make("PlanPricing", pricing=pricing, price=10)
+        order = baker.make(
+            Order, user=user, plan=plan_pricing.plan, pricing=pricing, amount=10
+        )
+        self.client.force_login(user)
+        return self.client.get(reverse("paypal-payment", args=[order.id]))
+
+    def test_monthly_pricing_uses_day_unit(self):
+        response = self._get_payment_page(days=30)
+        form = response.context["form"]
+        self.assertEqual(form.initial["t3"], "D")
+        self.assertEqual(form.initial["p3"], 30)
+
+    def test_yearly_pricing_uses_year_unit(self):
+        """PayPal accepts at most 90 days / 52 weeks; a year must be Y."""
+        response = self._get_payment_page(days=365)
+        form = response.context["form"]
+        self.assertEqual(form.initial["t3"], "Y")
+
+    @override_settings(PAYPAL_TEST=True)
+    def test_form_ignores_global_sandbox_setting(self):
+        """
+        Live buttons must not switch to sandbox just because PAYPAL_TEST
+        is set - only the explicit test_mode_enabled flag may do that.
+        """
+        form = PlansPayPalPaymentsForm(initial={}, test_mode_enabled=False)
+        self.assertFalse(form.test_mode())
 
 
 class PaymentFailureViewTests(TestCase):
