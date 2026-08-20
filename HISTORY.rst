@@ -3,6 +3,17 @@
 History
 -------
 
+unreleased
+++++++++++
+
+* renewal orders recalculate the tax rate for the user's current billing
+  data instead of copying it from the subscription's first order forever.
+  PayPal charges a fixed gross, so the new rate is applied top-down: the
+  gross stays, the net amount adjusts (at most one cent off when no
+  cent-exact net exists for the new rate). Without ``PLANS_TAXATION_POLICY``,
+  without ``BillingInfo``, or on a failed VIES/rate lookup the previous
+  behaviour (copied tax) is kept.
+
 1.3.0 (2026-08-19)
 ++++++++++++++++++
 

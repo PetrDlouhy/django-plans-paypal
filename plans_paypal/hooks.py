@@ -1,11 +1,13 @@
 import ast
 import logging
+from decimal import ROUND_HALF_UP, Decimal
 
 from django.conf import settings
 from django.db import transaction
 from paypal.standard.ipn.signals import valid_ipn_received
 from paypal.standard.models import ST_PP_COMPLETED, ST_PP_PENDING
-from plans.base.models import AbstractRecurringUserPlan
+from plans import utils as plans_utils
+from plans.base.models import AbstractBillingInfo, AbstractRecurringUserPlan
 from plans.models import Order, Plan, Pricing
 
 from .models import PayPalPayment
@@ -34,6 +36,65 @@ def get_custom_data(ipn_obj):
         return {"first_order_id": ipn_obj.item_number}
 
 
+def _net_amount_for_gross(gross, tax):
+    """Net amount on the cent grid whose Order.total() is closest to gross.
+
+    Order.total() derives the gross from net and rate, so for some
+    gross/rate pairs no cent-exact net exists; the closest candidate is
+    at most one cent off. Prefers the exact match, then the lower total,
+    so the order never exceeds what was actually received.
+    """
+    base = (gross * 100 / (Decimal(tax) + 100)).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
+    candidates = []
+    for amount in (base - Decimal("0.01"), base, base + Decimal("0.01")):
+        total = (amount * (Decimal(tax) + 100) / 100).quantize(Decimal("1.00"))
+        candidates.append((abs(total - gross), total, amount))
+    difference, total, amount = min(candidates)
+    if difference:
+        logger.warning(
+            "No cent-exact net for gross %s at tax %s, using %s (total %s)",
+            gross,
+            tax,
+            amount,
+            total,
+        )
+    return amount
+
+
+def get_renewal_tax_and_amount(user, gross):
+    """Current tax for the user's billing data, net derived from the fixed gross.
+
+    PayPal charges a fixed gross per subscription, so a tax-rate change
+    since the first order has to be applied top-down: the gross stays,
+    the net adjusts. Returns None when the current rate cannot be
+    determined (no taxation policy, no billing info, VIES failure) -
+    the caller then keeps the values copied from the first order.
+    """
+    if getattr(settings, "PLANS_TAXATION_POLICY", None) is None:
+        return None
+    if not hasattr(user, "billinginfo"):
+        return None
+    billing_info = user.billinginfo
+    if not billing_info.country:
+        return None
+    country = billing_info.country.code
+    if billing_info.tax_number:
+        tax_number = AbstractBillingInfo.get_full_tax_number(
+            billing_info.tax_number, country
+        )
+    else:
+        tax_number = None
+    tax, request_successful = plans_utils.get_tax_rate(country, tax_number)
+    if not request_successful:
+        return None
+    gross = Decimal(str(gross))
+    if tax is None:
+        return None, gross
+    return tax, _net_amount_for_gross(gross, tax)
+
+
 def create_new_order(order, user_plan, ipn_obj, custom_ipn_data):
     """
     Create order for automatic plan renewal (create new order)
@@ -55,12 +116,22 @@ def create_new_order(order, user_plan, ipn_obj, custom_ipn_data):
             },
         )
 
+    # The first order's tax froze at subscription start; recalculate for
+    # the current billing data when possible, keeping the charged gross.
+    renewal_tax_and_amount = get_renewal_tax_and_amount(
+        user_plan.user, ipn_obj.mc_gross
+    )
+    if renewal_tax_and_amount is None:
+        tax, amount = order.tax, order.amount
+    else:
+        tax, amount = renewal_tax_and_amount
+
     return Order.objects.create(
         user=user_plan.user,
         plan=plan,
         pricing=pricing,
-        amount=order.amount,
-        tax=order.tax,
+        amount=amount,
+        tax=tax,
         currency=ipn_obj.mc_currency,
     )
 
