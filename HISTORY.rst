@@ -6,6 +6,11 @@ History
 unreleased
 ++++++++++
 
+* CI: test matrix updated to Django 4.2-5.2 on Python 3.9-3.13 (dropped
+  EOL Django 3.2-4.1 and Python 3.8), GitHub Actions bumped to current
+  versions, coverage reporting moved from Codecov to Coveralls
+* packaging: classifiers and ``python_requires`` reflect the supported
+  versions
 * renewal orders recalculate the tax rate for the user's current billing
   data instead of copying it from the subscription's first order forever.
   PayPal charges a fixed gross, so the new rate is applied top-down: the
