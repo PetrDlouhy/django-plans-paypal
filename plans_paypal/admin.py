@@ -1,10 +1,13 @@
 from django.contrib import admin
+from related_admin import RelatedFieldAdmin
 
 from .models import PayPalPayment
 
 
 @admin.register(PayPalPayment)
-class PayPalPaymentAdmin(admin.ModelAdmin):
+class PayPalPaymentAdmin(RelatedFieldAdmin):
+    # RelatedFieldAdmin resolves the `__` paths in list_display; plain
+    # ModelAdmin supports them only on Django 5.1+ (admin.E108 below).
     list_display = (
         "order",
         "user_plan",

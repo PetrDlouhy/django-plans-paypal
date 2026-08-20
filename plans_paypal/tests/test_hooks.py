@@ -467,6 +467,75 @@ class HooksTests(TestCase):
         self.assertEqual(new_order.amount, Decimal("7.35"))
         self.assertEqual(new_order.total(), Decimal("8.89"))
 
+    @override_settings(PLANS_TAXATION_POLICY=STUB_POLICY, PLANS_INVOICE_ISSUER=ISSUER)
+    def test_receive_ipn_renewal_keeps_copied_tax_with_empty_country(self):
+        """BillingInfo without a country cannot be recalculated for."""
+        user, user_plan, order, pricing = self._make_renewal(
+            tax=24, amount=Decimal("11.18"), country=""
+        )
+        ipn = self._renewal_ipn(user_plan, order, pricing, Decimal("13.86"))
+
+        paypal_payment = receive_ipn(ipn)
+
+        new_order = paypal_payment.order
+        self.assertEqual(new_order.tax, Decimal("24"))
+        self.assertEqual(new_order.amount, Decimal("11.18"))
+
+    @override_settings(PLANS_INVOICE_ISSUER=ISSUER)
+    @patch("plans_paypal.hooks.logger")
+    def test_receive_ipn_renewal_empty_custom_falls_back_to_item_number(
+        self, mock_logger
+    ):
+        """
+        PayPal sometimes sends an empty `custom` field. The order is then
+        found via item_number and plan/pricing fall back to the user's
+        current plan and the first order's pricing.
+        """
+        user, user_plan, order, pricing = self._make_renewal(
+            tax=12, amount=100, billing_info=False
+        )
+        ipn = baker.make(
+            "PayPalIPN",
+            txn_type="subscr_payment",
+            payment_status=ST_PP_COMPLETED,
+            receiver_email="fake@email.com",
+            mc_gross=Decimal("112.00"),
+            custom="",
+            item_number=str(order.id),
+        )
+
+        paypal_payment = receive_ipn(ipn)
+
+        new_order = paypal_payment.order
+        self.assertNotEqual(new_order, order)
+        self.assertEqual(new_order.plan, user_plan.plan)
+        self.assertEqual(new_order.pricing, order.pricing)
+        self.assertEqual(new_order.tax, Decimal("12"))
+        mock_logger.exception.assert_called_once()
+
+    def test_receive_ipn_cancellation_token_mismatch_keeps_recurring(self):
+        """
+        A cancellation IPN with a foreign subscr_id must not delete the
+        user's recurring plan (e.g. a stale IPN after re-subscribing).
+        """
+        user = baker.make("User", username="foobar")
+        user_plan = baker.make("UserPlan", user=user)
+        baker.make("RecurringUserPlan", user_plan=user_plan, token=1234)
+        order = baker.make("Order", user=user, status=Order.STATUS.COMPLETED)
+        ipn = baker.make(
+            "PayPalIPN",
+            txn_type="subscr_cancel",
+            receiver_email="fake@email.com",
+            subscr_id=9999,
+            custom="{" f"'first_order_id': {order.id}," "}",
+        )
+
+        self.assertIsNone(receive_ipn(ipn))
+
+        user_plan.refresh_from_db()
+        self.assertTrue(hasattr(user_plan, "recurring"))
+        self.assertEqual(user_plan.recurring.token, "1234")
+
     def test_receive_ipn_cancellation(self):
         """
         Test cancellation IPN status.
