@@ -118,13 +118,19 @@ def create_new_order(order, user_plan, ipn_obj, custom_ipn_data):
 
     # The first order's tax froze at subscription start; recalculate for
     # the current billing data when possible, keeping the charged gross.
+    # Without a taxation lookup, an armed RecurringUserPlan expectation
+    # (the updatable counterpart of a PayPal-side amount change) beats
+    # the first order's frozen copy.
     renewal_tax_and_amount = get_renewal_tax_and_amount(
         user_plan.user, ipn_obj.mc_gross
     )
-    if renewal_tax_and_amount is None:
-        tax, amount = order.tax, order.amount
-    else:
+    recurring = getattr(user_plan, "recurring", None)
+    if renewal_tax_and_amount is not None:
         tax, amount = renewal_tax_and_amount
+    elif recurring is not None and recurring.amount is not None:
+        tax, amount = recurring.tax, recurring.amount
+    else:
+        tax, amount = order.tax, order.amount
 
     return Order.objects.create(
         user=user_plan.user,
@@ -213,11 +219,23 @@ def receive_ipn(sender, **kwargs):
         # ALSO: for the same reason, you need to check the amount
         # received, `custom` etc. are all what you expect or what
         # is allowed.
-        if order.total() != ipn_obj.mc_gross:
+        # The first order's total is frozen at subscription start, so a
+        # subscription amount legitimately updated on PayPal's side (e.g.
+        # after a VAT change) is validated against the armed
+        # RecurringUserPlan expectation as well - that is the updatable
+        # counterpart of the PayPal-side change. Editing the historical
+        # first order to pass this check is exactly what must not happen.
+        expected_totals = [order.total()]
+        recurring = getattr(user_plan, "recurring", None)
+        if recurring is not None and recurring.amount is not None:
+            expected_totals.append(
+                Order(amount=recurring.amount, tax=recurring.tax).total()
+            )
+        if ipn_obj.mc_gross not in expected_totals:
             logger.error(
                 "Received amount doesn't match",
                 extra={
-                    "order_total": order.total,
+                    "expected_totals": expected_totals,
                     "ipn_amount": ipn_obj.mc_gross,
                     "ipn_obj": ipn_obj,
                 },
