@@ -513,6 +513,53 @@ class HooksTests(TestCase):
         self.assertEqual(new_order.tax, Decimal("12"))
         mock_logger.exception.assert_called_once()
 
+    @override_settings(PLANS_INVOICE_ISSUER=ISSUER)
+    def test_receive_ipn_accepts_amount_matching_recurring_plan(self):
+        """
+        A subscription amount legitimately updated on PayPal's side (e.g.
+        after a VAT change) must be accepted when it matches the armed
+        RecurringUserPlan expectation, even though it differs from the
+        first order's total.
+        """
+        user = baker.make("User", username="foobar")
+        user_plan = baker.make("UserPlan", user=user)
+        # Expectation updated to net 100 at 21% -> total 121.00
+        baker.make(
+            "RecurringUserPlan",
+            user_plan=user_plan,
+            amount=Decimal("100"),
+            tax=Decimal("21"),
+        )
+        order = baker.make(
+            "Order", user=user, status=Order.STATUS.COMPLETED, tax=19, amount=100
+        )
+        pricing = baker.make("Pricing")
+        ipn = self._renewal_ipn(user_plan, order, pricing, Decimal("121.00"))
+
+        paypal_payment = receive_ipn(ipn)
+
+        new_order = paypal_payment.order
+        self.assertNotEqual(new_order, order)
+        self.assertEqual(new_order.total(), Decimal("121.00"))
+
+    def test_receive_ipn_rejects_amount_matching_neither_expectation(self):
+        user = baker.make("User", username="foobar")
+        user_plan = baker.make("UserPlan", user=user)
+        baker.make(
+            "RecurringUserPlan",
+            user_plan=user_plan,
+            amount=Decimal("100"),
+            tax=Decimal("21"),
+        )
+        order = baker.make(
+            "Order", user=user, status=Order.STATUS.COMPLETED, tax=19, amount=100
+        )
+        pricing = baker.make("Pricing")
+        ipn = self._renewal_ipn(user_plan, order, pricing, Decimal("999.00"))
+
+        with self.assertRaisesRegex(Exception, "Received amount doesn't match"):
+            receive_ipn(ipn)
+
     def test_receive_ipn_cancellation_token_mismatch_keeps_recurring(self):
         """
         A cancellation IPN with a foreign subscr_id must not delete the
