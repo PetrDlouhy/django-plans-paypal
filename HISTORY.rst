@@ -3,6 +3,18 @@
 History
 -------
 
+unreleased
+++++++++++
+
+* the received-amount check accepts, besides the first order's total,
+  the total implied by the armed ``RecurringUserPlan`` (net x current
+  tax). This makes legitimate subscription-amount updates on PayPal's
+  side (e.g. after a VAT change) processable: update the
+  ``RecurringUserPlan`` expectation, then change the amount at PayPal.
+  Renewal orders without a taxation policy configured now also prefer
+  that expectation over the first order's frozen copy, so the invoice
+  matches what was actually charged.
+
 1.4.0 (2026-08-20)
 ++++++++++++++++++
 
