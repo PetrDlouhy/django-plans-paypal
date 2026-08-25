@@ -3,9 +3,17 @@
 History
 -------
 
-unreleased
-++++++++++
+1.5.0 (2026-08-25)
+++++++++++++++++++
 
+* tests: full 100 % line and branch coverage, and CI now gates on it
+  (``coverage report --fail-under=100``). New coverage includes the
+  sandbox business-email validation, stale cancellations for users
+  without a recurring plan, VAT IDs reaching the taxation policy in
+  full form, encrypted-form certificate wiring (sandbox vs. live), and
+  a characterization of the week-unit period conversion (fractional
+  ``p3`` - PayPal documents an integer; left as-is deliberately, live
+  subscriptions depend on current behaviour)
 * the received-amount check accepts, besides the first order's total,
   the total implied by the armed ``RecurringUserPlan`` (net x current
   tax). This makes legitimate subscription-amount updates on PayPal's

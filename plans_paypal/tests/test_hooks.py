@@ -560,6 +560,58 @@ class HooksTests(TestCase):
         with self.assertRaisesRegex(Exception, "Received amount doesn't match"):
             receive_ipn(ipn)
 
+    @override_settings(PLANS_TAXATION_POLICY=STUB_POLICY, PLANS_INVOICE_ISSUER=ISSUER)
+    @patch.object(StubTaxationPolicy, "get_tax_rate")
+    def test_receive_ipn_renewal_company_vat_id_passed_to_policy(self, mock_rate):
+        """A billing VAT ID reaches the taxation policy in full form."""
+        mock_rate.return_value = (None, True)
+        user, user_plan, order, pricing = self._make_renewal(
+            tax=None, amount=100, billing_info=False
+        )
+        baker.make("BillingInfo", user=user, country="DE", tax_number="123456789")
+        ipn = self._renewal_ipn(user_plan, order, pricing, Decimal("100.00"))
+
+        receive_ipn(ipn)
+
+        mock_rate.assert_called_with(
+            "DE123456789", "DE", None
+        )  # pragma: allowlist secret
+
+    def test_receive_ipn_cancellation_without_recurring_plan(self):
+        """A stale cancellation for a user with no recurring plan is a no-op."""
+        user_plan = baker.make("UserPlan")
+        order = baker.make("Order", user=user_plan.user, status=Order.STATUS.COMPLETED)
+        ipn = baker.make(
+            "PayPalIPN",
+            txn_type="subscr_cancel",
+            subscr_id=1234,
+            custom="{" f"'first_order_id': {order.id}," "}",
+        )
+
+        self.assertIsNone(receive_ipn(ipn))
+
+        user_plan.refresh_from_db()
+        self.assertFalse(hasattr(user_plan, "recurring"))
+
+    @override_settings(PAYPAL_TEST_BUSSINESS_EMAIL="sandbox@email.com")
+    def test_receive_ipn_sandbox_validates_against_test_business_email(self):
+        """A test IPN must be checked against the sandbox business email."""
+        user_plan = baker.make("UserPlan")
+        order = baker.make("Order", user=user_plan.user, amount=100)
+        ipn = baker.make(
+            "PayPalIPN",
+            txn_type="subscr_payment",
+            payment_status=ST_PP_COMPLETED,
+            test_ipn=True,
+            receiver_email="fake@email.com",
+            mc_gross=Decimal("100.00"),
+            custom="{" f"'first_order_id': {order.id}," "}",
+        )
+        with self.assertRaisesRegex(
+            Exception, "doesn't match: 'fake@email.com' != 'sandbox@email.com'"
+        ):
+            receive_ipn(ipn)
+
     def test_receive_ipn_cancellation_token_mismatch_keeps_recurring(self):
         """
         A cancellation IPN with a foreign subscr_id must not delete the

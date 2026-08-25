@@ -1,3 +1,5 @@
+from unittest import mock
+
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from model_bakery import baker
@@ -38,6 +40,51 @@ class PaymentFormViewTests(TestCase):
         """
         form = PlansPayPalPaymentsForm(initial={}, test_mode_enabled=False)
         self.assertFalse(form.test_mode())
+
+    @override_settings(PAYPAL_TEST=True)
+    def test_form_sandbox_mode_follows_global_setting_when_enabled(self):
+        form = PlansPayPalPaymentsForm(initial={}, test_mode_enabled=True)
+        self.assertTrue(form.test_mode())
+
+    def test_mid_length_pricing_uses_week_unit(self):
+        """
+        91-363 day pricings convert to weeks. Characterizes the current
+        fractional p3 (PayPal documents an integer) - do not "fix" without
+        evidence live subscriptions need it changed.
+        """
+        response = self._get_payment_page(days=180)
+        form = response.context["form"]
+        self.assertEqual(form.initial["t3"], "W")
+        self.assertEqual(form.initial["p3"], 180 / 7)
+
+    @override_settings(
+        PAYPAL_ENCRYPTED_FORM=True,
+        PAYPAL_TEST_BUSSINESS_EMAIL="sandbox@email.com",
+        PAYPAL_TEST_PRIVATE_CERT="test-priv.pem",
+        PAYPAL_TEST_PUBLIC_CERT="test-pub.pem",
+        PAYPAL_TEST_CERT="test-paypal.pem",
+        PAYPAL_TEST_CERT_ID="TESTCERTID",
+    )
+    @mock.patch("plans_paypal.views.PlansPayPalEncryptedPaymentsForm")
+    def test_sandbox_encrypted_form_gets_test_certificates(self, mock_form):
+        user = baker.make("User")
+        baker.make("UserPlan", user=user)
+        pricing = baker.make("Pricing", period=30)
+        plan_pricing = baker.make("PlanPricing", pricing=pricing, price=10)
+        order = baker.make(
+            Order, user=user, plan=plan_pricing.plan, pricing=pricing, amount=10
+        )
+        self.client.force_login(user)
+        self.client.get(reverse("paypal-payment-sandbox", args=[order.id]))
+        self.assertEqual(mock_form.call_args.kwargs["private_cert"], "test-priv.pem")
+        self.assertEqual(mock_form.call_args.kwargs["cert_id"], "TESTCERTID")
+
+    @override_settings(PAYPAL_ENCRYPTED_FORM=True)
+    @mock.patch("plans_paypal.views.PlansPayPalEncryptedPaymentsForm")
+    def test_live_encrypted_form_gets_no_test_certificates(self, mock_form):
+        """Live encrypted buttons use the defaults, not sandbox certs."""
+        self._get_payment_page(days=30)
+        self.assertNotIn("private_cert", mock_form.call_args.kwargs)
 
 
 class PaymentFailureViewTests(TestCase):

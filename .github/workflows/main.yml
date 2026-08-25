@@ -50,6 +50,7 @@ jobs:
         run: |
           python -W error::DeprecationWarning -m coverage run manage.py test
           coverage xml
+          coverage report --fail-under=100
 
       # The old `pip install codecov` + `codecov` CLI stopped working when
       # Codecov shut down that uploader's endpoint in 2023 - uploads failed
