@@ -1,6 +1,7 @@
 from decimal import Decimal
 from unittest.mock import patch
 
+from django.core.exceptions import ValidationError
 from django.test import TestCase, override_settings
 from model_bakery import baker
 from paypal.standard.models import ST_PP_COMPLETED
@@ -8,7 +9,12 @@ from plans.base.models import AbstractRecurringUserPlan
 from plans.models import Invoice, Order
 from plans.taxation import TaxationPolicy
 
-from plans_paypal.hooks import get_custom_data, parse_custom, receive_ipn
+from plans_paypal.hooks import (
+    create_new_order,
+    get_custom_data,
+    parse_custom,
+    receive_ipn,
+)
 
 
 class StubTaxationPolicy(TaxationPolicy):
@@ -293,6 +299,7 @@ class HooksTests(TestCase):
         self.assertNotEqual(paypal_payment.order, order)
         self.assertEqual(paypal_payment.order.amount, 100.00)
         self.assertEqual(paypal_payment.order.tax, 12.0)
+        self.assertEqual(paypal_payment.order.gross_amount, Decimal("112.00"))
         self.assertEqual(paypal_payment.order.total(), 112.00)
         user.userplan.refresh_from_db()
         new_recurring_plan = user.userplan.recurring
@@ -396,6 +403,7 @@ class HooksTests(TestCase):
         self.assertNotEqual(new_order, order)
         self.assertEqual(new_order.tax, Decimal("25.5"))
         self.assertEqual(new_order.amount, Decimal("11.04"))
+        self.assertEqual(new_order.gross_amount, Decimal("13.86"))
         self.assertEqual(new_order.total(), Decimal("13.86"))
         user.userplan.refresh_from_db()
         self.assertEqual(user.userplan.recurring.tax, Decimal("25.5"))
@@ -448,11 +456,14 @@ class HooksTests(TestCase):
         self.assertEqual(new_order.amount, Decimal("11.18"))
 
     @override_settings(PLANS_TAXATION_POLICY=STUB_POLICY, PLANS_INVOICE_ISSUER=ISSUER)
-    def test_receive_ipn_renewal_inexact_gross_picks_closest_total(self):
+    def test_receive_ipn_renewal_unreachable_gross_is_stored_and_split_top_down(
+        self,
+    ):
         """
-        No cent-exact net exists for gross 8.90 at 21% (7.35 -> 8.89,
-        7.36 -> 8.91). The closest total wins; on a tie the lower one,
-        so the invoice never exceeds what was received.
+        No net cent value reaches gross 8.90 at 21% (7.35 -> 8.89,
+        7.36 -> 8.91). The charged gross is stored as the order total and
+        the net derived from it by the coefficient method, so the invoice
+        carries exactly what PayPal charged.
         """
         user, user_plan, order, pricing = self._make_renewal(
             tax=None, amount=Decimal("8.90"), country="LV"
@@ -464,8 +475,14 @@ class HooksTests(TestCase):
 
         new_order = paypal_payment.order
         self.assertEqual(new_order.tax, Decimal("21"))
-        self.assertEqual(new_order.amount, Decimal("7.35"))
-        self.assertEqual(new_order.total(), Decimal("8.89"))
+        self.assertEqual(new_order.gross_amount, Decimal("8.90"))
+        self.assertEqual(new_order.amount, Decimal("7.36"))
+        self.assertEqual(new_order.tax_total(), Decimal("1.54"))
+        self.assertEqual(new_order.total(), Decimal("8.90"))
+        invoice = Invoice.objects.get(type=Invoice.INVOICE_TYPES.INVOICE)
+        self.assertEqual(invoice.total, Decimal("8.90"))
+        self.assertEqual(invoice.total_net, Decimal("7.36"))
+        self.assertEqual(invoice.tax_total, Decimal("1.54"))
 
     @override_settings(PLANS_TAXATION_POLICY=STUB_POLICY, PLANS_INVOICE_ISSUER=ISSUER)
     def test_receive_ipn_renewal_keeps_copied_tax_with_empty_country(self):
@@ -540,7 +557,72 @@ class HooksTests(TestCase):
 
         new_order = paypal_payment.order
         self.assertNotEqual(new_order, order)
+        self.assertEqual(new_order.tax, Decimal("21"))
+        self.assertEqual(new_order.amount, Decimal("100"))
+        self.assertEqual(new_order.gross_amount, Decimal("121.00"))
         self.assertEqual(new_order.total(), Decimal("121.00"))
+
+    @override_settings(PLANS_INVOICE_ISSUER=ISSUER)
+    def test_receive_ipn_copies_first_order_when_paypal_charged_its_total(self):
+        """
+        The RecurringUserPlan expectation was updated but PayPal still
+        charged the first order's total: the order must carry the first
+        order's tax and net, the values the charge actually corresponds to.
+        """
+        user = baker.make("User", username="foobar")
+        user_plan = baker.make("UserPlan", user=user)
+        baker.make(
+            "RecurringUserPlan",
+            user_plan=user_plan,
+            amount=Decimal("100"),
+            tax=Decimal("21"),
+        )
+        order = baker.make(
+            "Order", user=user, status=Order.STATUS.COMPLETED, tax=19, amount=100
+        )
+        pricing = baker.make("Pricing")
+        ipn = self._renewal_ipn(user_plan, order, pricing, Decimal("119.00"))
+
+        paypal_payment = receive_ipn(ipn)
+
+        new_order = paypal_payment.order
+        self.assertEqual(new_order.tax, Decimal("19"))
+        self.assertEqual(new_order.amount, Decimal("100"))
+        self.assertEqual(new_order.gross_amount, Decimal("119.00"))
+        self.assertEqual(new_order.total(), Decimal("119.00"))
+
+    def test_create_new_order_without_recurring_copies_first_order(self):
+        """No armed RecurringUserPlan at all: the first order is the only
+        candidate."""
+        user, user_plan, order, pricing = self._make_renewal(
+            tax=19, amount=100, billing_info=False
+        )
+        user_plan.recurring.delete()
+        user_plan = user_plan.__class__.objects.get(pk=user_plan.pk)
+        ipn = self._renewal_ipn(user_plan, order, pricing, Decimal("119.00"))
+
+        new_order = create_new_order(order, user_plan, ipn, get_custom_data(ipn))
+
+        self.assertEqual(new_order.tax, Decimal("19"))
+        self.assertEqual(new_order.amount, Decimal("100"))
+        self.assertEqual(new_order.gross_amount, Decimal("119.00"))
+
+    def test_create_new_order_rejects_gross_matching_no_copy(self):
+        """
+        Neither the expectation nor the first order explains the charged
+        gross (only reachable by calling create_new_order outside the
+        IPN validation): the order is not saved rather than invoiced for
+        an amount that was not charged.
+        """
+        user, user_plan, order, pricing = self._make_renewal(
+            tax=19, amount=100, billing_info=False
+        )
+        ipn = self._renewal_ipn(user_plan, order, pricing, Decimal("150.00"))
+
+        with self.assertRaises(ValidationError):
+            create_new_order(order, user_plan, ipn, get_custom_data(ipn))
+
+        self.assertEqual(Order.objects.count(), 1)
 
     def test_receive_ipn_rejects_amount_matching_neither_expectation(self):
         user = baker.make("User", username="foobar")

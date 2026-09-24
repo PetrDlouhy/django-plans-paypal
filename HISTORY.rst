@@ -3,6 +3,27 @@
 History
 -------
 
+1.6.0 (unreleased)
+++++++++++++++++++
+
+* renewal orders store the charged gross: ``create_new_order`` sets
+  ``Order.gross_amount`` (django-plans 2.7.0) to the IPN's ``mc_gross``
+  and derives the net with ``Order.net_from_gross()`` (coefficient
+  method, tax = gross x rate / (100 + rate)). Multiplying a net cent
+  value by a rate cannot reach every gross cent value, so a renewal
+  after a tax-rate change could only pick the nearest net and was
+  invoiced a cent below the charge (e.g. 14.89 at 21 %: 12.30 -> 14.88,
+  12.31 -> 14.90). The invoice now carries exactly what PayPal charged;
+  the "closest total" workaround and its warning are gone
+* when the current rate cannot be determined, the copied values
+  (``RecurringUserPlan`` expectation, then the first order) are chosen
+  by which one's total equals the charged gross. Previously the
+  expectation won even when PayPal had charged the first order's total,
+  so the order carried an amount other than the one received. If
+  neither matches, ``Order.save()`` now rejects the order instead of
+  invoicing an amount that was not charged
+* requires django-plans >= 2.7.0
+
 1.5.0 (2026-08-25)
 ++++++++++++++++++
 
