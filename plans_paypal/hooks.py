@@ -1,6 +1,6 @@
 import ast
 import logging
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import Decimal
 
 from django.conf import settings
 from django.db import transaction
@@ -36,33 +36,6 @@ def get_custom_data(ipn_obj):
         return {"first_order_id": ipn_obj.item_number}
 
 
-def _net_amount_for_gross(gross, tax):
-    """Net amount on the cent grid whose Order.total() is closest to gross.
-
-    Order.total() derives the gross from net and rate, so for some
-    gross/rate pairs no cent-exact net exists; the closest candidate is
-    at most one cent off. Prefers the exact match, then the lower total,
-    so the order never exceeds what was actually received.
-    """
-    base = (gross * 100 / (Decimal(tax) + 100)).quantize(
-        Decimal("0.01"), rounding=ROUND_HALF_UP
-    )
-    candidates = []
-    for amount in (base - Decimal("0.01"), base, base + Decimal("0.01")):
-        total = (amount * (Decimal(tax) + 100) / 100).quantize(Decimal("1.00"))
-        candidates.append((abs(total - gross), total, amount))
-    difference, total, amount = min(candidates)
-    if difference:
-        logger.warning(
-            "No cent-exact net for gross %s at tax %s, using %s (total %s)",
-            gross,
-            tax,
-            amount,
-            total,
-        )
-    return amount
-
-
 def get_renewal_tax_and_amount(user, gross):
     """Current tax for the user's billing data, net derived from the fixed gross.
 
@@ -89,10 +62,7 @@ def get_renewal_tax_and_amount(user, gross):
     tax, request_successful = plans_utils.get_tax_rate(country, tax_number)
     if not request_successful:
         return None
-    gross = Decimal(str(gross))
-    if tax is None:
-        return None, gross
-    return tax, _net_amount_for_gross(gross, tax)
+    return tax, Order.net_from_gross(Decimal(str(gross)), tax)
 
 
 def create_new_order(order, user_plan, ipn_obj, custom_ipn_data):
@@ -116,21 +86,16 @@ def create_new_order(order, user_plan, ipn_obj, custom_ipn_data):
             },
         )
 
-    # The first order's tax froze at subscription start; recalculate for
-    # the current billing data when possible, keeping the charged gross.
-    # Without a taxation lookup, an armed RecurringUserPlan expectation
-    # (the updatable counterpart of a PayPal-side amount change) beats
-    # the first order's frozen copy.
+    # PayPal charged a fixed gross: the order stores it as its total and
+    # derives the net from it. The first order's tax froze at subscription
+    # start, so recalculate for the current billing data when possible.
     renewal_tax_and_amount = get_renewal_tax_and_amount(
         user_plan.user, ipn_obj.mc_gross
     )
-    recurring = getattr(user_plan, "recurring", None)
     if renewal_tax_and_amount is not None:
         tax, amount = renewal_tax_and_amount
-    elif recurring is not None and recurring.amount is not None:
-        tax, amount = recurring.tax, recurring.amount
     else:
-        tax, amount = order.tax, order.amount
+        tax, amount = _copied_tax_and_amount(order, user_plan, ipn_obj.mc_gross)
 
     return Order.objects.create(
         user=user_plan.user,
@@ -138,8 +103,31 @@ def create_new_order(order, user_plan, ipn_obj, custom_ipn_data):
         pricing=pricing,
         amount=amount,
         tax=tax,
+        gross_amount=ipn_obj.mc_gross,
         currency=ipn_obj.mc_currency,
     )
+
+
+def _copied_tax_and_amount(order, user_plan, gross):
+    """Tax and net to copy when the current rate cannot be determined.
+
+    Candidates are the armed ``RecurringUserPlan`` expectation (the
+    updatable counterpart of a PayPal-side amount change) and the first
+    order's frozen copy, in that order; the first whose total equals the
+    charged gross wins. When neither matches, the first candidate is
+    returned and the ``gross_amount`` validation on ``Order.save()``
+    rejects the order: an invoice for an amount other than the one
+    charged must not be issued silently.
+    """
+    recurring = getattr(user_plan, "recurring", None)
+    candidates = []
+    if recurring is not None and recurring.amount is not None:
+        candidates.append((recurring.tax, recurring.amount))
+    candidates.append((order.tax, order.amount))
+    for tax, amount in candidates:
+        if Order(amount=amount, tax=tax).total() == gross:
+            return tax, amount
+    return candidates[0]
 
 
 @transaction.atomic

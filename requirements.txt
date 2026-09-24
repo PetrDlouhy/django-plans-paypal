@@ -3,6 +3,6 @@
 
 django-author>=1.0.3
 django-extensions
-django-plans
+django-plans>=2.7.0
 django-paypal
 django-related-admin
