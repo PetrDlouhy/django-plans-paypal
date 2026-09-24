@@ -3,7 +3,7 @@
 History
 -------
 
-1.6.0 (unreleased)
+1.6.0 (2026-09-24)
 ++++++++++++++++++
 
 * renewal orders store the charged gross: ``create_new_order`` sets
