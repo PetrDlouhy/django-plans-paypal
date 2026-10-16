@@ -1,5 +1,7 @@
 [run]
 branch = true
+# sysmon, the default core on Python 3.14+, does not run file-tracer plugins.
+core = ctrace
 plugins =
     django_coverage_plugin
 
