@@ -3,6 +3,20 @@
 History
 -------
 
+1.7.1 (unreleased)
+++++++++++++++++++
+
+* security: a renewal order gets the plan and pricing of the
+  subscription's first order. It took them from the ``plan_id`` and
+  ``pricing_id`` in the IPN's ``custom``, a field of the subscribe
+  button that the buyer can edit, so a subscription paying the cheapest
+  order's price renewed into whatever plan the buyer named. The IPN
+  amount check passed, because it compares against the first order's
+  total. ``create_new_order()`` loses its ``custom_ipn_data`` argument
+* a renewal whose ``custom`` lacks ``plan_id`` no longer falls back to
+  the user's current plan, which could differ from the plan the
+  subscription pays for
+
 1.7.0 (2026-10-16)
 ++++++++++++++++++
 
