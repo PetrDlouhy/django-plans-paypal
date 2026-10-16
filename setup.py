@@ -58,7 +58,8 @@ setup(
     url="https://github.com/PetrDlouhy/django-plans-paypal",
     packages=find_packages(
         exclude=[
-            "tests.templates",
+            "tests",
+            "tests.*",
             "plans_paypal.templates.paypal_payments",
             "plans_paypal.templates",
         ]

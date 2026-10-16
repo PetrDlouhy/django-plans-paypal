@@ -72,6 +72,9 @@ USD installations are not affected.
 * Python 3.9 support dropped (end of life since October 2025):
   ``python_requires`` is ``>=3.10``. GitHub's ``ubuntu-latest`` runner
   moves to Ubuntu 26.04, which has no Python 3.9 build
+* packaging: the wheel no longer installs a top-level ``tests`` package
+  (the test project's settings and urls), which could shadow or be
+  shadowed by a project's own ``tests``
 
 1.6.0 (2026-09-24)
 ++++++++++++++++++
