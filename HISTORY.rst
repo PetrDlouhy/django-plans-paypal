@@ -69,6 +69,9 @@ USD installations are not affected.
   sandbox setup relying on it has to set ``PAYPAL_TEST = True``, as the
   README always said. Live IPNs are processed in either mode, unchanged.
   IPNs other than subscription ones are still left to other receivers
+* Python 3.9 support dropped (end of life since October 2025):
+  ``python_requires`` is ``>=3.10``. GitHub's ``ubuntu-latest`` runner
+  moves to Ubuntu 26.04, which has no Python 3.9 build
 
 1.6.0 (2026-09-24)
 ++++++++++++++++++
