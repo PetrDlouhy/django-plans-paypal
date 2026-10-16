@@ -379,12 +379,15 @@ class HooksTests(TestCase):
         )
         self.assertFalse(user.userplan.recurring.token_verified)
 
-    def _renewal_ipn(self, user_plan, order, pricing, mc_gross, mc_currency="USD"):
+    def _renewal_ipn(
+        self, user_plan, order, pricing, mc_gross, mc_currency="USD", subscr_id=""
+    ):
         return baker.make(
             "PayPalIPN",
             txn_type="subscr_payment",
             payment_status=ST_PP_COMPLETED,
             receiver_email="fake@email.com",
+            subscr_id=subscr_id,
             mc_gross=mc_gross,
             mc_currency=mc_currency,
             custom="{"
@@ -574,6 +577,7 @@ class HooksTests(TestCase):
         baker.make(
             "RecurringUserPlan",
             user_plan=user_plan,
+            token="I-1",
             amount=Decimal("100"),
             tax=Decimal("21"),
         )
@@ -586,7 +590,9 @@ class HooksTests(TestCase):
             currency="USD",
         )
         pricing = baker.make("Pricing")
-        ipn = self._renewal_ipn(user_plan, order, pricing, Decimal("121.00"))
+        ipn = self._renewal_ipn(
+            user_plan, order, pricing, Decimal("121.00"), subscr_id="I-1"
+        )
 
         paypal_payment = receive_ipn(ipn)
 
@@ -596,6 +602,43 @@ class HooksTests(TestCase):
         self.assertEqual(new_order.amount, Decimal("100"))
         self.assertEqual(new_order.gross_amount, Decimal("121.00"))
         self.assertEqual(new_order.total(), Decimal("121.00"))
+
+    def test_receive_ipn_rejects_amount_matching_another_subscriptions_plan(self):
+        """
+        The armed expectation belongs to the subscription that armed it.
+        A buyer whose cheap monthly subscription is armed could otherwise
+        edit the yearly order's button to the monthly price: the new
+        subscription's payment matched the old expectation and completed
+        the yearly order.
+        """
+        user = baker.make("User")
+        user_plan = baker.make("UserPlan", user=user)
+        baker.make(
+            "RecurringUserPlan",
+            user_plan=user_plan,
+            token="I-MONTHLY",
+            amount=Decimal("10"),
+            tax=None,
+        )
+        yearly_order = baker.make("Order", user=user, amount=100, currency="USD")
+        ipn = baker.make(
+            "PayPalIPN",
+            txn_type="subscr_payment",
+            payment_status=ST_PP_COMPLETED,
+            receiver_email="fake@email.com",
+            subscr_id="I-YEARLY",
+            mc_gross=Decimal("10.00"),
+            mc_currency="USD",
+            custom="{" f"'first_order_id': {yearly_order.id}," "}",
+        )
+
+        with self.assertLogs("plans_paypal.hooks", "ERROR"):
+            with self.assertRaisesRegex(Exception, "Received amount doesn't match"):
+                receive_ipn(ipn)
+
+        yearly_order.refresh_from_db()
+        self.assertEqual(yearly_order.status, Order.STATUS.NEW)
+        self.assertEqual(RecurringUserPlan.objects.get().token, "I-MONTHLY")
 
     @override_settings(PLANS_INVOICE_ISSUER=ISSUER)
     def test_receive_ipn_copies_first_order_when_paypal_charged_its_total(self):
@@ -609,6 +652,7 @@ class HooksTests(TestCase):
         baker.make(
             "RecurringUserPlan",
             user_plan=user_plan,
+            token="I-1",
             amount=Decimal("100"),
             tax=Decimal("21"),
         )
@@ -621,7 +665,9 @@ class HooksTests(TestCase):
             currency="USD",
         )
         pricing = baker.make("Pricing")
-        ipn = self._renewal_ipn(user_plan, order, pricing, Decimal("119.00"))
+        ipn = self._renewal_ipn(
+            user_plan, order, pricing, Decimal("119.00"), subscr_id="I-1"
+        )
 
         paypal_payment = receive_ipn(ipn)
 
@@ -888,6 +934,7 @@ class HooksTests(TestCase):
         baker.make(
             "RecurringUserPlan",
             user_plan=user_plan,
+            token="I-1",
             amount=Decimal("100"),
             tax=Decimal("21"),
         )
@@ -900,7 +947,9 @@ class HooksTests(TestCase):
             currency="USD",
         )
         pricing = baker.make("Pricing")
-        ipn = self._renewal_ipn(user_plan, order, pricing, Decimal("999.00"))
+        ipn = self._renewal_ipn(
+            user_plan, order, pricing, Decimal("999.00"), subscr_id="I-1"
+        )
 
         with self.assertRaisesRegex(Exception, "Received amount doesn't match"):
             receive_ipn(ipn)
