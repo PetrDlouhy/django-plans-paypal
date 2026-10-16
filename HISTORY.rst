@@ -75,6 +75,9 @@ USD installations are not affected.
 * packaging: the wheel no longer installs a top-level ``tests`` package
   (the test project's settings and urls), which could shadow or be
   shadowed by a project's own ``tests``
+* development: ``make test`` and ``make coverage`` run the suite through
+  ``manage.py test`` like CI and tox; they ran ``runtests.py tests``,
+  which found 0 tests. ``runtests.py`` is gone
 
 1.6.0 (2026-09-24)
 ++++++++++++++++++
