@@ -78,6 +78,7 @@ USD installations are not affected.
 * development: ``make test`` and ``make coverage`` run the suite through
   ``manage.py test`` like CI and tox; they ran ``runtests.py tests``,
   which found 0 tests. ``runtests.py`` is gone
+* CI: Dependabot checks GitHub Actions and pip requirements weekly
 
 1.6.0 (2026-09-24)
 ++++++++++++++++++
