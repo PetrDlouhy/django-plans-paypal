@@ -8,7 +8,7 @@ from paypal.standard.ipn.signals import valid_ipn_received
 from paypal.standard.models import ST_PP_COMPLETED, ST_PP_PENDING
 from plans import utils as plans_utils
 from plans.base.models import AbstractBillingInfo, AbstractRecurringUserPlan
-from plans.models import Order, Plan, Pricing
+from plans.models import Order
 
 from .currency import paypal_currency
 from .models import PayPalPayment
@@ -66,27 +66,17 @@ def get_renewal_tax_and_amount(user, gross):
     return tax, Order.net_from_gross(Decimal(str(gross)), tax)
 
 
-def create_new_order(order, user_plan, ipn_obj, custom_ipn_data):
+def create_new_order(order, user_plan, ipn_obj):
     """
     Create order for automatic plan renewal (create new order)
 
     This could also happen if the original order was canceled.
     In that case we want to create new order.
-    """
-    try:
-        plan = Plan.objects.get(pk=custom_ipn_data["plan_id"])
-        pricing = Pricing.objects.get(pk=custom_ipn_data["pricing_id"])
-    except (Plan.DoesNotExist, KeyError):
-        plan = user_plan.plan
-        pricing = order.pricing
-        logger.exception(
-            "Plan or pricing not found in custom data",
-            extra={
-                "custom_data": custom_ipn_data,
-                "ipn_obj": ipn_obj,
-            },
-        )
 
+    The subscription renews what its first order bought. The ``plan_id``
+    and ``pricing_id`` in ``custom`` say the same for an untouched button,
+    but the buyer can edit them.
+    """
     # PayPal charged a fixed gross: the order stores it as its total and
     # derives the net from it. The first order's tax froze at subscription
     # start, so recalculate for the current billing data when possible.
@@ -100,8 +90,8 @@ def create_new_order(order, user_plan, ipn_obj, custom_ipn_data):
 
     return Order.objects.create(
         user=user_plan.user,
-        plan=plan,
-        pricing=pricing,
+        plan=order.plan,
+        pricing=order.pricing,
         amount=amount,
         tax=tax,
         gross_amount=ipn_obj.mc_gross,
@@ -266,7 +256,7 @@ def receive_ipn(sender, **kwargs):
         _check_payment(ipn_obj, order, user_plan)
         # Undertake some action depending upon `ipn_obj`.
         if order.status != Order.STATUS.NEW:
-            order = create_new_order(order, user_plan, ipn_obj, custom_ipn_data)
+            order = create_new_order(order, user_plan, ipn_obj)
         user_plan.set_plan_renewal(
             order,
             token=ipn_obj.subscr_id,
