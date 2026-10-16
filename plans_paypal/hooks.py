@@ -96,7 +96,7 @@ def create_new_order(order, user_plan, ipn_obj, custom_ipn_data):
     if renewal_tax_and_amount is not None:
         tax, amount = renewal_tax_and_amount
     else:
-        tax, amount = _copied_tax_and_amount(order, user_plan, ipn_obj.mc_gross)
+        tax, amount = _copied_tax_and_amount(order, user_plan, ipn_obj)
 
     return Order.objects.create(
         user=user_plan.user,
@@ -109,24 +109,40 @@ def create_new_order(order, user_plan, ipn_obj, custom_ipn_data):
     )
 
 
-def _copied_tax_and_amount(order, user_plan, gross):
-    """Tax and net to copy when the current rate cannot be determined.
+def _subscription_expectation(user_plan, ipn_obj):
+    """``(tax, amount)`` the armed ``RecurringUserPlan`` expects of this IPN.
 
-    Candidates are the armed ``RecurringUserPlan`` expectation (the
-    updatable counterpart of a PayPal-side amount change) and the first
-    order's frozen copy, in that order; the first whose total equals the
-    charged gross wins. When neither matches, the first candidate is
-    returned and the ``gross_amount`` validation on ``Order.save()``
-    rejects the order: an invoice for an amount other than the one
-    charged must not be issued silently.
+    None unless the IPN's subscription armed it: ``set_plan_renewal()``
+    stores the ``subscr_id`` as the token. Another subscription's
+    expectation (an older PayPal one, a card) says nothing about what
+    this subscription may charge.
     """
     recurring = getattr(user_plan, "recurring", None)
+    if recurring is None or recurring.amount is None:
+        return None
+    if str(recurring.token) != str(ipn_obj.subscr_id):
+        return None
+    return recurring.tax, recurring.amount
+
+
+def _copied_tax_and_amount(order, user_plan, ipn_obj):
+    """Tax and net to copy when the current rate cannot be determined.
+
+    Candidates are the subscription's armed ``RecurringUserPlan``
+    expectation (the updatable counterpart of a PayPal-side amount
+    change) and the first order's frozen copy, in that order; the first
+    whose total equals the charged gross wins. When neither matches, the
+    first candidate is returned and the ``gross_amount`` validation on
+    ``Order.save()`` rejects the order: an invoice for an amount other
+    than the one charged must not be issued silently.
+    """
     candidates = []
-    if recurring is not None and recurring.amount is not None:
-        candidates.append((recurring.tax, recurring.amount))
+    expectation = _subscription_expectation(user_plan, ipn_obj)
+    if expectation is not None:
+        candidates.append(expectation)
     candidates.append((order.tax, order.amount))
     for tax, amount in candidates:
-        if Order(amount=amount, tax=tax).total() == gross:
+        if Order(amount=amount, tax=tax).total() == ipn_obj.mc_gross:
             return tax, amount
     return candidates[0]
 
@@ -225,11 +241,10 @@ def receive_ipn(sender, **kwargs):
         # counterpart of the PayPal-side change. Editing the historical
         # first order to pass this check is exactly what must not happen.
         expected_totals = [order.total()]
-        recurring = getattr(user_plan, "recurring", None)
-        if recurring is not None and recurring.amount is not None:
-            expected_totals.append(
-                Order(amount=recurring.amount, tax=recurring.tax).total()
-            )
+        expectation = _subscription_expectation(user_plan, ipn_obj)
+        if expectation is not None:
+            tax, amount = expectation
+            expected_totals.append(Order(amount=amount, tax=tax).total())
         if ipn_obj.mc_gross not in expected_totals:
             logger.error(
                 "Received amount doesn't match",
