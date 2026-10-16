@@ -3,6 +3,16 @@
 History
 -------
 
+1.7.1 (unreleased)
+++++++++++++++++++
+
+* security: a pending ``subscr_payment`` (an eCheck clearing, recorded
+  since 1.3.0) passes the same checks as a completed one before it is
+  recorded: ``receiver_email``, amount and currency. It was recorded as
+  a payment in flight for whatever order and amount the edited button
+  named, and support reads that record as "the customer is paying". A
+  refused one raises like a refused completed payment, nothing written
+
 1.7.0 (2026-10-16)
 ++++++++++++++++++
 

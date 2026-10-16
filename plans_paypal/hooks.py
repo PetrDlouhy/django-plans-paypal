@@ -131,6 +131,66 @@ def _copied_tax_and_amount(order, user_plan, gross):
     return candidates[0]
 
 
+def _check_payment(ipn_obj, order, user_plan):
+    """Refuse a subscription payment that the order's button did not ask for.
+
+    The button is a client-side form: the buyer can edit its ``business``,
+    ``a3`` and ``currency_code`` before it goes to PayPal. The postback
+    only proves that PayPal sent the IPN, not what it charged or to whom.
+    """
+    # WARNING !
+    # Check that the receiver email is the same we previously
+    # set on the `business` field. (The user could tamper with
+    # that fields on the payment form before it goes to PayPal)
+    bussiness_email = settings.PAYPAL_BUSSINESS_EMAIL
+    if ipn_obj.test_ipn:
+        bussiness_email = settings.PAYPAL_TEST_BUSSINESS_EMAIL
+    if ipn_obj.receiver_email != bussiness_email:
+        # Not a valid payment
+        raise Exception(
+            f"Returned email doesn't match: '{ipn_obj.receiver_email}' != '{bussiness_email}'"
+        )
+
+    # ALSO: for the same reason, you need to check the amount
+    # received, `custom` etc. are all what you expect or what
+    # is allowed.
+    # The first order's total is frozen at subscription start, so a
+    # subscription amount legitimately updated on PayPal's side (e.g.
+    # after a VAT change) is validated against the armed
+    # RecurringUserPlan expectation as well - that is the updatable
+    # counterpart of the PayPal-side change. Editing the historical
+    # first order to pass this check is exactly what must not happen.
+    expected_totals = [order.total()]
+    recurring = getattr(user_plan, "recurring", None)
+    if recurring is not None and recurring.amount is not None:
+        expected_totals.append(
+            Order(amount=recurring.amount, tax=recurring.tax).total()
+        )
+    if ipn_obj.mc_gross not in expected_totals:
+        logger.error(
+            "Received amount doesn't match",
+            extra={
+                "expected_totals": expected_totals,
+                "ipn_amount": ipn_obj.mc_gross,
+                "ipn_obj": ipn_obj,
+            },
+        )
+        raise Exception("Received amount doesn't match")
+    # The amount alone proves nothing: the button's currency_code is
+    # just as editable, so 9.90 JPY would pass for a 9.90 USD order.
+    expected_currency = paypal_currency(order)
+    if ipn_obj.mc_currency.upper() != expected_currency:
+        logger.error(
+            "Received currency doesn't match",
+            extra={
+                "expected_currency": expected_currency,
+                "ipn_currency": ipn_obj.mc_currency,
+                "ipn_obj": ipn_obj,
+            },
+        )
+        raise Exception("Received currency doesn't match")
+
+
 @transaction.atomic
 def receive_ipn(sender, **kwargs):
     # Atomic, because the completed branch arms the plan renewal and
@@ -191,6 +251,7 @@ def receive_ipn(sender, **kwargs):
         # tell the customer to re-subscribe, and PayPal then billed both
         # subscriptions. Record the attempt; the follow-up COMPLETED IPN
         # for the same transaction completes the order as usual.
+        _check_payment(ipn_obj, order, user_plan)
         logger.info(
             "Pending subscription payment (e.g. eCheck) recorded for order %s",
             order.pk,
@@ -202,58 +263,7 @@ def receive_ipn(sender, **kwargs):
     elif (
         ipn_obj.is_subscription_payment() and ipn_obj.payment_status == ST_PP_COMPLETED
     ):
-        # WARNING !
-        # Check that the receiver email is the same we previously
-        # set on the `business` field. (The user could tamper with
-        # that fields on the payment form before it goes to PayPal)
-        bussiness_email = settings.PAYPAL_BUSSINESS_EMAIL
-        if ipn_obj.test_ipn:
-            bussiness_email = settings.PAYPAL_TEST_BUSSINESS_EMAIL
-        if ipn_obj.receiver_email != bussiness_email:
-            # Not a valid payment
-            raise Exception(
-                f"Returned email doesn't match: '{ipn_obj.receiver_email}' != '{bussiness_email}'"
-            )
-
-        # ALSO: for the same reason, you need to check the amount
-        # received, `custom` etc. are all what you expect or what
-        # is allowed.
-        # The first order's total is frozen at subscription start, so a
-        # subscription amount legitimately updated on PayPal's side (e.g.
-        # after a VAT change) is validated against the armed
-        # RecurringUserPlan expectation as well - that is the updatable
-        # counterpart of the PayPal-side change. Editing the historical
-        # first order to pass this check is exactly what must not happen.
-        expected_totals = [order.total()]
-        recurring = getattr(user_plan, "recurring", None)
-        if recurring is not None and recurring.amount is not None:
-            expected_totals.append(
-                Order(amount=recurring.amount, tax=recurring.tax).total()
-            )
-        if ipn_obj.mc_gross not in expected_totals:
-            logger.error(
-                "Received amount doesn't match",
-                extra={
-                    "expected_totals": expected_totals,
-                    "ipn_amount": ipn_obj.mc_gross,
-                    "ipn_obj": ipn_obj,
-                },
-            )
-            raise Exception("Received amount doesn't match")
-        # The amount alone proves nothing: the button's currency_code is
-        # just as editable, so 9.90 JPY would pass for a 9.90 USD order.
-        expected_currency = paypal_currency(order)
-        if ipn_obj.mc_currency.upper() != expected_currency:
-            logger.error(
-                "Received currency doesn't match",
-                extra={
-                    "expected_currency": expected_currency,
-                    "ipn_currency": ipn_obj.mc_currency,
-                    "ipn_obj": ipn_obj,
-                },
-            )
-            raise Exception("Received currency doesn't match")
-
+        _check_payment(ipn_obj, order, user_plan)
         # Undertake some action depending upon `ipn_obj`.
         if order.status != Order.STATUS.NEW:
             order = create_new_order(order, user_plan, ipn_obj, custom_ipn_data)
