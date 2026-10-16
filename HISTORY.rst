@@ -69,6 +69,16 @@ USD installations are not affected.
   sandbox setup relying on it has to set ``PAYPAL_TEST = True``, as the
   README always said. Live IPNs are processed in either mode, unchanged.
   IPNs other than subscription ones are still left to other receivers
+* Python 3.9 support dropped (end of life since October 2025):
+  ``python_requires`` is ``>=3.10``. GitHub's ``ubuntu-latest`` runner
+  moves to Ubuntu 26.04, which has no Python 3.9 build
+* packaging: the wheel no longer installs a top-level ``tests`` package
+  (the test project's settings and urls), which could shadow or be
+  shadowed by a project's own ``tests``
+* development: ``make test`` and ``make coverage`` run the suite through
+  ``manage.py test`` like CI and tox; they ran ``runtests.py tests``,
+  which found 0 tests. ``runtests.py`` is gone
+* CI: Dependabot checks GitHub Actions and pip requirements weekly
 
 1.6.0 (2026-09-24)
 ++++++++++++++++++

@@ -58,14 +58,15 @@ setup(
     url="https://github.com/PetrDlouhy/django-plans-paypal",
     packages=find_packages(
         exclude=[
-            "tests.templates",
+            "tests",
+            "tests.*",
             "plans_paypal.templates.paypal_payments",
             "plans_paypal.templates",
         ]
     ),
     include_package_data=True,
     install_requires=parse_requirements("requirements.txt"),
-    python_requires=">=3.9",
+    python_requires=">=3.10",
     license="MIT",
     zip_safe=False,
     keywords="django-plans-paypal",
@@ -80,7 +81,6 @@ setup(
         "Intended Audience :: Developers",
         "Natural Language :: English",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",

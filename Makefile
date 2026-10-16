@@ -31,13 +31,13 @@ lint: ## check style with flake8
 	flake8 plans_paypal tests
 
 test: ## run tests quickly with the default Python
-	python runtests.py tests
+	python -W error::DeprecationWarning manage.py test
 
 test-all: ## run tests on every Python version with tox
 	tox
 
 coverage: ## check code coverage quickly with the default Python
-	coverage run --source plans_paypal runtests.py tests
+	coverage run manage.py test
 	coverage report -m
 	coverage html
 	open htmlcov/index.html
