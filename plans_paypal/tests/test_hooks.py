@@ -78,10 +78,11 @@ class HooksTests(TestCase):
         mock_logger.exception.assert_called_once()
 
     def test_parse_custom(self):
+        """The button's json.dumps(), a user without an email included."""
         self.assertEqual(
             parse_custom(
                 '{"user_plan_id": 250329, "plan_id": 1, '
-                '\'pricing_id\': 1, "first_order_id": 32782, "user_email": null}'
+                '"pricing_id": 1, "first_order_id": 32782, "user_email": null}'
             ),
             {
                 "user_plan_id": 250329,
@@ -91,6 +92,52 @@ class HooksTests(TestCase):
                 "user_email": None,
             },
         )
+
+    def test_parse_custom_keeps_null_inside_a_string(self):
+        """Replacing "null" with "None" before parsing changed the values."""
+        self.assertEqual(
+            parse_custom('{"first_order_id": 5, "user_email": "nullpointer@x.cz"}'),
+            {"first_order_id": 5, "user_email": "nullpointer@x.cz"},
+        )
+
+    def test_parse_custom_reads_the_python_repr_of_0_4_5_buttons(self):
+        """
+        0.4.5 put the dict itself into the form, which rendered its Python
+        repr; renewals of subscriptions from then still carry it, and
+        they have no item_number to fall back to.
+        """
+        for email, value in (("'a@x.cz'", "a@x.cz"), ("None", None)):
+            with self.subTest(email=email):
+                self.assertEqual(
+                    parse_custom(
+                        "{'user_plan_id': 1, 'plan_id': 2, 'pricing_id': 3, "
+                        f"'first_order_id': 4, 'user_email': {email}}}"
+                    ),
+                    {
+                        "user_plan_id": 1,
+                        "plan_id": 2,
+                        "pricing_id": 3,
+                        "first_order_id": 4,
+                        "user_email": value,
+                    },
+                )
+
+    @patch("plans_paypal.hooks.logger")
+    def test_get_custom_data_without_first_order_id_falls_back(self, mock_logger):
+        """
+        `custom` is buyer-editable: a value that parses but is not a dict
+        with first_order_id crashed receive_ipn() with a TypeError or
+        KeyError instead of falling back to item_number.
+        """
+        for custom in ("[1, 2]", "5", "{}", '{"plan_id": 1}', "{[]: 1}", "{{}}"):
+            with self.subTest(custom=custom):
+                mock_logger.reset_mock()
+                ipn = baker.make("PayPalIPN", custom=custom, item_number="7")
+
+                self.assertEqual(get_custom_data(ipn), {"first_order_id": "7"})
+
+                logged = mock_logger.error.call_count + mock_logger.exception.call_count
+                self.assertEqual(logged, 1)
 
     @patch("plans_paypal.hooks.logger")
     def test_receive_ipn_exception(self, mock_logger):
