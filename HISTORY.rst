@@ -31,6 +31,15 @@ History
   order's button to the monthly price, and the new subscription's first
   payment completed the yearly order. A renewal's tax split falls back
   to such an expectation under the same condition
+* the IPN's ``custom`` is parsed as JSON, which is what the button
+  writes. ``ast.literal_eval`` remains only as the fallback for 0.4.5
+  buttons, which wrote the Python repr of a dict. Replacing ``null``
+  with ``None`` before ``literal_eval`` changed values that contain
+  "null" (``nullpointer@...`` became ``Nonepointer@...``)
+* a ``custom`` that parses to anything but a dict with
+  ``first_order_id`` (a list, a number, ``{}``, an unhashable key) falls
+  back to ``item_number`` and logs an error, as unparseable data
+  already did. It crashed ``receive_ipn()`` with a TypeError or KeyError
 
 1.7.0 (2026-10-16)
 ++++++++++++++++++
