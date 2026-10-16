@@ -46,6 +46,12 @@ USD installations are not affected.
   amount check passed and the order completed (a renewal was even
   invoiced in JPY). The IPN postback only proves PayPal sent the
   notification, not what it charged
+* a renewal order is invoiced in the subscription's currency
+  (``paypal_currency()`` of the first order) instead of the IPN's
+  ``mc_currency``. The notification decided the invoice currency, and
+  ``create_new_order()`` can be called without the IPN checks; a
+  lower-case ``mc_currency`` also leaked into the order and the
+  ``RecurringUserPlan``
 
 1.6.0 (2026-09-24)
 ++++++++++++++++++

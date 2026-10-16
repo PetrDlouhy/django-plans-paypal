@@ -105,7 +105,7 @@ def create_new_order(order, user_plan, ipn_obj, custom_ipn_data):
         amount=amount,
         tax=tax,
         gross_amount=ipn_obj.mc_gross,
-        currency=ipn_obj.mc_currency,
+        currency=paypal_currency(order),
     )
 
 

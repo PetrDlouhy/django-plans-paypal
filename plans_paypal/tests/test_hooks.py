@@ -757,6 +757,25 @@ class HooksTests(TestCase):
     def test_receive_ipn_renewal_currency_ignores_case(self):
         self._assert_renewal_accepted("eur", "Eur")
 
+    def test_receive_ipn_renewal_is_invoiced_in_the_subscription_currency(self):
+        renewal = self._assert_renewal_accepted("EUR", "eur")
+
+        self.assertEqual(renewal.currency, "EUR")
+        self.assertEqual(RecurringUserPlan.objects.get().currency, "EUR")
+
+    def test_create_new_order_does_not_take_the_currency_from_the_ipn(self):
+        """create_new_order() is public: it may run without the IPN checks."""
+        user, user_plan, order, pricing = self._make_renewal(
+            tax=None, amount=100, billing_info=False, currency="USD"
+        )
+        ipn = self._renewal_ipn(
+            user_plan, order, pricing, Decimal("100.00"), mc_currency="JPY"
+        )
+
+        renewal = create_new_order(order, user_plan, ipn, get_custom_data(ipn))
+
+        self.assertEqual(renewal.currency, "USD")
+
     def test_receive_ipn_pending_payment_in_another_currency_completes_nothing(
         self,
     ):
