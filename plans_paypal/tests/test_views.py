@@ -194,20 +194,49 @@ class PaymentFailureViewTests(TestCase):
         )
 
 
+@override_settings(PAYPAL_TEST_BUSSINESS_EMAIL="sandbox@email.com")
 class PayPalPaymentViewTests(TestCase):
-    def test_paypal_payment_view(self):
-        order = baker.make(
+    """The page's hidden ``custom`` field carries the order owner's email."""
+
+    def setUp(self):
+        self.owner = baker.make("User")
+        baker.make("UserPlan", user=self.owner)
+        self.order = baker.make(
             Order,
-            user=baker.make("User"),
+            user=self.owner,
             pricing__period=30,
             pricing__name="test pricing",
             plan__name="test plan",
         )
-        baker.make("UserPlan", user=order.user)
-        response = self.client.get(reverse("paypal-payment", args=[order.id]))
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(
-            response,
-            "<h1>Confirm our subscribtion</h1>",
-            html=True,
-        )
+        self.urls = [
+            reverse(name, args=[self.order.id])
+            for name in ("paypal-payment", "paypal-payment-sandbox")
+        ]
+
+    def test_owner_gets_the_payment_page(self):
+        self.client.force_login(self.owner)
+        for url in self.urls:
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertContains(
+                    response,
+                    "<h1>Confirm our subscribtion</h1>",
+                    html=True,
+                )
+
+    def test_anonymous_is_sent_to_login(self):
+        for url in self.urls:
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertRedirects(
+                    response,
+                    "/accounts/login/?next=" + url,
+                    fetch_redirect_response=False,
+                )
+
+    def test_other_users_order_is_not_found(self):
+        self.client.force_login(baker.make("User"))
+        for url in self.urls:
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, 404)
