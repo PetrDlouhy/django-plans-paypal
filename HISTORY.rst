@@ -56,6 +56,8 @@ USD installations are not affected.
   PayPal rejects even as ``.00``; a total with a fraction of those
   currencies (e.g. 999 JPY + 21 % = 1208.79) raises ``ValueError`` in
   the payment view instead of PayPal refusing the button
+* admin: the PayPal payment list shows the charged currency next to the
+  gross and fee
 
 1.6.0 (2026-09-24)
 ++++++++++++++++++
