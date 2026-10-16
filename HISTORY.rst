@@ -3,6 +3,17 @@
 History
 -------
 
+1.7.0 (unreleased)
+++++++++++++++++++
+
+* the subscribe button charges the order's currency: it sends
+  ``currency_code`` = ``order.currency`` (upper-cased). It never set
+  one, so django-paypal's form default ``USD`` was sent, and an
+  installation whose ``PLANS_CURRENCY`` is not USD charged USD for
+  orders invoiced in its own currency (the same number, a different
+  amount of money). ``plans_paypal.currency.paypal_currency()`` is the
+  one place that names the currency of an order's subscription at PayPal
+
 1.6.0 (2026-09-24)
 ++++++++++++++++++
 

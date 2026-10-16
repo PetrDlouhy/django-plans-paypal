@@ -9,6 +9,8 @@ from django.views.generic import View
 from paypal.standard.forms import PayPalEncryptedPaymentsForm, PayPalPaymentsForm
 from plans.models import Order
 
+from .currency import paypal_currency
+
 logger = logging.getLogger(__name__)
 
 
@@ -61,6 +63,7 @@ def view_that_asks_for_money(request, order_id, sandbox=False):
             if sandbox
             else settings.PAYPAL_BUSSINESS_EMAIL
         ),
+        "currency_code": paypal_currency(order),
         "a3": str(order.total()),  # monthly price
         "p3": period,  # duration of each unit (depends on unit)
         "t3": duration_unit,  # duration unit ("M for Month")
