@@ -3,7 +3,7 @@
 History
 -------
 
-1.7.0 (unreleased)
+1.7.0 (2026-10-16)
 ++++++++++++++++++
 
 **Upgrade note - installations whose** ``PLANS_CURRENCY`` **is not USD:
@@ -75,6 +75,11 @@ USD installations are not affected.
   ``OrderView``. It looked the order up by id alone, so anyone, even
   anonymous, could open it for any order id and read the owner's email
   from the button's hidden ``custom`` field
+* the app pins ``default_auto_field`` to ``AutoField``, the type its
+  migrations use: with ``DEFAULT_AUTO_FIELD = BigAutoField`` (the global
+  default since Django 6.0) ``makemigrations`` wrote a migration into the
+  installed package
+* tested on Django 6.0 and 6.1 and on Python 3.14
 * Python 3.9 support dropped (end of life since October 2025):
   ``python_requires`` is ``>=3.10``. GitHub's ``ubuntu-latest`` runner
   moves to Ubuntu 26.04, which has no Python 3.9 build
