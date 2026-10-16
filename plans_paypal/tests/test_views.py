@@ -61,6 +61,24 @@ class PaymentFormViewTests(TestCase):
         self.assertEqual(form["currency_code"].value(), "EUR")
         _encrypt.assert_called_once_with()
 
+    def test_button_amount_keeps_cents_in_a_decimal_currency(self):
+        response = self._get_payment_page(days=30, currency="EUR", tax=21)
+        self.assertEqual(response.context["form"]["a3"].value(), "12.10")
+
+    def test_button_amount_has_no_decimals_in_a_zero_decimal_currency(self):
+        """PayPal rejects decimals for HUF, JPY and TWD, even ".00"."""
+        for currency in ("HUF", "JPY", "TWD", "jpy"):
+            with self.subTest(currency=currency):
+                response = self._get_payment_page(
+                    days=30, currency=currency, amount=1000, tax=21
+                )
+                self.assertEqual(response.context["form"]["a3"].value(), "1210")
+
+    def test_button_refuses_a_fraction_of_a_zero_decimal_currency(self):
+        """999 JPY + 21 % is 1208.79 JPY, which PayPal cannot charge."""
+        with self.assertRaisesRegex(ValueError, "1208.79 JPY"):
+            self._get_payment_page(days=30, currency="JPY", amount=999, tax=21)
+
     @override_settings(PAYPAL_TEST=True)
     def test_form_ignores_global_sandbox_setting(self):
         """

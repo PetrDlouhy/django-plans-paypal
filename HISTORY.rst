@@ -52,6 +52,10 @@ USD installations are not affected.
   ``create_new_order()`` can be called without the IPN checks; a
   lower-case ``mc_currency`` also leaked into the order and the
   ``RecurringUserPlan``
+* the button amount (``a3``) has no decimals in HUF, JPY and TWD, which
+  PayPal rejects even as ``.00``; a total with a fraction of those
+  currencies (e.g. 999 JPY + 21 % = 1208.79) raises ``ValueError`` in
+  the payment view instead of PayPal refusing the button
 
 1.6.0 (2026-09-24)
 ++++++++++++++++++

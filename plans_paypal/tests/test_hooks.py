@@ -776,6 +776,42 @@ class HooksTests(TestCase):
 
         self.assertEqual(renewal.currency, "USD")
 
+    def test_receive_ipn_accepts_zero_decimal_gross(self):
+        """PayPal reports 1210 JPY without decimals; the order total is 1210.00."""
+        user, user_plan, order, pricing = self._make_renewal(
+            tax=21, amount=1000, billing_info=False, currency="JPY"
+        )
+        ipn = self._renewal_ipn(
+            user_plan, order, pricing, Decimal("1210"), mc_currency="JPY"
+        )
+
+        renewal = receive_ipn(ipn).order
+
+        self.assertEqual(renewal.currency, "JPY")
+        self.assertEqual(renewal.total(), Decimal("1210"))
+        self.assertEqual(renewal.tax, Decimal("21"))
+
+    @override_settings(PLANS_TAXATION_POLICY=STUB_POLICY, PLANS_INVOICE_ISSUER=ISSUER)
+    def test_receive_ipn_renewal_tax_split_keeps_zero_decimal_gross(self):
+        """
+        The net is derived on django-plans' cent grid in every currency, so
+        a JPY renewal's net and tax can carry sen; the charged gross stays
+        exact (Order.validate_gross_amount() allows no whole-yen net here).
+        """
+        user, user_plan, order, pricing = self._make_renewal(
+            tax=21, amount=1000, currency="JPY"
+        )
+        ipn = self._renewal_ipn(
+            user_plan, order, pricing, Decimal("1210"), mc_currency="JPY"
+        )
+
+        renewal = receive_ipn(ipn).order
+
+        self.assertEqual(renewal.tax, StubTaxationPolicy.rate)
+        self.assertEqual(renewal.gross_amount, Decimal("1210"))
+        self.assertEqual(renewal.total(), Decimal("1210"))
+        self.assertEqual(renewal.amount + renewal.tax_total(), Decimal("1210"))
+
     def test_receive_ipn_pending_payment_in_another_currency_completes_nothing(
         self,
     ):
