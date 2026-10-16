@@ -75,6 +75,17 @@ Override `django-plans` class `CreateOrderView` so that `get_success_url()` retu
     def get_success_url(self):
        return reverse("paypal-payment", kwargs={'order_id': self.object.id})
 
+Currency
+--------
+
+The subscribe button charges the order's currency (``Order.currency``,
+which django-plans sets from ``PLANS_CURRENCY``). PayPal has to support
+it for your account, see https://developer.paypal.com/reference/currency-codes/.
+A subscription payment that arrives in any other currency is refused.
+HUF, JPY and TWD amounts are sent without decimals; an order whose total
+has a fraction of those currencies cannot be paid (the payment view
+raises ``ValueError``), so price plans in whole units there.
+
 Sandbox testing
 ---------------
 

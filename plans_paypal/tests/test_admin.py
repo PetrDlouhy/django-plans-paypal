@@ -38,3 +38,16 @@ class PayPalPaymentAdminTests(TestCase):
         self.assertContains(response, "Completed")
         self.assertContains(response, "payer@example.com")
         self.assertContains(response, str(payment.order))
+
+    def test_changelist_shows_the_charged_currency(self):
+        """Gross and fee mean nothing without it; old non-USD rows are USD."""
+        baker.make(
+            PayPalPayment,
+            paypal_ipn=baker.make("PayPalIPN", mc_gross=1210, mc_currency="JPY"),
+        )
+        response = self.client.get(
+            reverse("admin:plans_paypal_paypalpayment_changelist")
+        )
+        self.assertContains(
+            response, '<td class="field-paypal_ipn__mc_currency">JPY</td>', html=True
+        )

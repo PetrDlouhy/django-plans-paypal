@@ -3,6 +3,62 @@
 History
 -------
 
+1.7.0 (unreleased)
+++++++++++++++++++
+
+**Upgrade note - installations whose** ``PLANS_CURRENCY`` **is not USD:
+PayPal subscriptions created before this version keep renewing in USD
+and their payments are now refused.** Earlier buttons charged USD
+whatever the order's currency, and PayPal cannot change the currency of
+an existing subscription. A refused IPN leaves the subscriber charged
+but the plan not extended (no renewal order, the IPN view answers
+HTTP 500 and PayPal retries). Cancel those subscriptions at PayPal
+before upgrading (the plans stay active until their paid period ends)
+and have the subscribers subscribe again once this version is deployed,
+so the new button charges the order's currency. To find them::
+
+    from django.conf import settings
+    from paypal.standard.ipn.models import PayPalIPN
+
+    ended = PayPalIPN.objects.filter(txn_type__in=["subscr_cancel", "subscr_eot"])
+    affected = set(
+        PayPalIPN.objects.filter(txn_type="subscr_payment", payment_status="Completed")
+        .exclude(mc_currency__iexact=settings.PLANS_CURRENCY)
+        .exclude(subscr_id__in=ended.values("subscr_id"))
+        .values_list("subscr_id", flat=True)
+    )
+
+USD installations are not affected.
+
+* the subscribe button charges the order's currency: it sends
+  ``currency_code`` = ``order.currency`` (upper-cased). It never set
+  one, so django-paypal's form default ``USD`` was sent, and an
+  installation whose ``PLANS_CURRENCY`` is not USD charged USD for
+  orders invoiced in its own currency (the same number, a different
+  amount of money). ``plans_paypal.currency.paypal_currency()`` is the
+  one place that names the currency of an order's subscription at PayPal
+* security: a completed ``subscr_payment`` IPN, first payment or renewal,
+  whose ``mc_currency`` is not the subscription's currency is refused
+  like an amount mismatch, nothing written:
+  ``Exception("Received currency doesn't match")``. The comparison
+  ignores case. The button is a client-side form, so a buyer could edit
+  its ``currency_code`` and pay a 9.90 USD order with 9.90 JPY; the
+  amount check passed and the order completed (a renewal was even
+  invoiced in JPY). The IPN postback only proves PayPal sent the
+  notification, not what it charged
+* a renewal order is invoiced in the subscription's currency
+  (``paypal_currency()`` of the first order) instead of the IPN's
+  ``mc_currency``. The notification decided the invoice currency, and
+  ``create_new_order()`` can be called without the IPN checks; a
+  lower-case ``mc_currency`` also leaked into the order and the
+  ``RecurringUserPlan``
+* the button amount (``a3``) has no decimals in HUF, JPY and TWD, which
+  PayPal rejects even as ``.00``; a total with a fraction of those
+  currencies (e.g. 999 JPY + 21 % = 1208.79) raises ``ValueError`` in
+  the payment view instead of PayPal refusing the button
+* admin: the PayPal payment list shows the charged currency next to the
+  gross and fee
+
 1.6.0 (2026-09-24)
 ++++++++++++++++++
 

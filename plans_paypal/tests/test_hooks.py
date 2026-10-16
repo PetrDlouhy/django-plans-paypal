@@ -4,9 +4,16 @@ from unittest.mock import patch
 from django.core.exceptions import ValidationError
 from django.test import TestCase, override_settings
 from model_bakery import baker
-from paypal.standard.models import ST_PP_COMPLETED
+from paypal.standard.models import (
+    ST_PP_COMPLETED,
+    ST_PP_DENIED,
+    ST_PP_FAILED,
+    ST_PP_PENDING,
+    ST_PP_REFUNDED,
+    ST_PP_REVERSED,
+)
 from plans.base.models import AbstractRecurringUserPlan
-from plans.models import Invoice, Order
+from plans.models import Invoice, Order, RecurringUserPlan
 from plans.taxation import TaxationPolicy
 
 from plans_paypal.hooks import (
@@ -15,6 +22,7 @@ from plans_paypal.hooks import (
     parse_custom,
     receive_ipn,
 )
+from plans_paypal.models import PayPalPayment
 
 
 class StubTaxationPolicy(TaxationPolicy):
@@ -161,7 +169,7 @@ class HooksTests(TestCase):
 
         user = baker.make("User", username="foobar")
         user_plan = baker.make("UserPlan", user=user)
-        order = baker.make("Order", user=user, amount=100)
+        order = baker.make("Order", user=user, amount=100, currency="USD")
         pricing = baker.make("Pricing")
         ipn = baker.make(
             "PayPalIPN",
@@ -187,7 +195,7 @@ class HooksTests(TestCase):
     def test_receive_ipn_completed(self):
         user = baker.make("User", username="foobar")
         user_plan = baker.make("UserPlan", user=user)
-        order = baker.make("Order", user=user, amount=100)
+        order = baker.make("Order", user=user, amount=100, currency="USD")
         order.user.save()
         pricing = baker.make("Pricing")
         ipn = baker.make(
@@ -224,7 +232,11 @@ class HooksTests(TestCase):
         user = baker.make("User", username="foobar")
         user_plan = baker.make("UserPlan", user=user)
         order = baker.make(
-            "Order", user=user, status=Order.STATUS.COMPLETED, amount=100
+            "Order",
+            user=user,
+            status=Order.STATUS.COMPLETED,
+            amount=100,
+            currency="USD",
         )
         order.user.save()
         pricing = baker.make("Pricing")
@@ -275,7 +287,12 @@ class HooksTests(TestCase):
         user_plan = baker.make("UserPlan", user=user)
         baker.make("RecurringUserPlan", user_plan=user_plan)
         order = baker.make(
-            "Order", user=user, status=Order.STATUS.COMPLETED, tax=12, amount=100
+            "Order",
+            user=user,
+            status=Order.STATUS.COMPLETED,
+            tax=12,
+            amount=100,
+            currency="USD",
         )
         baker.make("BillingInfo", user=user)
         order.user.save()
@@ -328,7 +345,12 @@ class HooksTests(TestCase):
         user_plan = baker.make("UserPlan", user=user)
         baker.make("RecurringUserPlan", user_plan=user_plan)
         order = baker.make(
-            "Order", user=user, status=Order.STATUS.COMPLETED, tax=12, amount=100
+            "Order",
+            user=user,
+            status=Order.STATUS.COMPLETED,
+            tax=12,
+            amount=100,
+            currency="USD",
         )
         order.user.save()
         pricing = baker.make("Pricing")
@@ -357,13 +379,14 @@ class HooksTests(TestCase):
         )
         self.assertFalse(user.userplan.recurring.token_verified)
 
-    def _renewal_ipn(self, user_plan, order, pricing, mc_gross):
+    def _renewal_ipn(self, user_plan, order, pricing, mc_gross, mc_currency="USD"):
         return baker.make(
             "PayPalIPN",
             txn_type="subscr_payment",
             payment_status=ST_PP_COMPLETED,
             receiver_email="fake@email.com",
             mc_gross=mc_gross,
+            mc_currency=mc_currency,
             custom="{"
             f"'first_order_id': {order.id},"
             f"'user_plan_id': {user_plan.id},"
@@ -372,12 +395,19 @@ class HooksTests(TestCase):
             "}",
         )
 
-    def _make_renewal(self, tax, amount, country="FI", billing_info=True):
+    def _make_renewal(
+        self, tax, amount, country="FI", billing_info=True, currency="USD"
+    ):
         user = baker.make("User", username="foobar")
         user_plan = baker.make("UserPlan", user=user)
         baker.make("RecurringUserPlan", user_plan=user_plan)
         order = baker.make(
-            "Order", user=user, status=Order.STATUS.COMPLETED, tax=tax, amount=amount
+            "Order",
+            user=user,
+            status=Order.STATUS.COMPLETED,
+            tax=tax,
+            amount=amount,
+            currency=currency,
         )
         if billing_info:
             baker.make("BillingInfo", user=user, country=country)
@@ -548,7 +578,12 @@ class HooksTests(TestCase):
             tax=Decimal("21"),
         )
         order = baker.make(
-            "Order", user=user, status=Order.STATUS.COMPLETED, tax=19, amount=100
+            "Order",
+            user=user,
+            status=Order.STATUS.COMPLETED,
+            tax=19,
+            amount=100,
+            currency="USD",
         )
         pricing = baker.make("Pricing")
         ipn = self._renewal_ipn(user_plan, order, pricing, Decimal("121.00"))
@@ -578,7 +613,12 @@ class HooksTests(TestCase):
             tax=Decimal("21"),
         )
         order = baker.make(
-            "Order", user=user, status=Order.STATUS.COMPLETED, tax=19, amount=100
+            "Order",
+            user=user,
+            status=Order.STATUS.COMPLETED,
+            tax=19,
+            amount=100,
+            currency="USD",
         )
         pricing = baker.make("Pricing")
         ipn = self._renewal_ipn(user_plan, order, pricing, Decimal("119.00"))
@@ -624,6 +664,224 @@ class HooksTests(TestCase):
 
         self.assertEqual(Order.objects.count(), 1)
 
+    def _first_payment_ipn(self, order_currency, mc_currency, **order_fields):
+        user = baker.make("User")
+        user_plan = baker.make("UserPlan", user=user)
+        order = baker.make(
+            "Order", user=user, amount=100, currency=order_currency, **order_fields
+        )
+        pricing = baker.make("Pricing")
+        ipn = self._renewal_ipn(
+            user_plan, order, pricing, Decimal("100.00"), mc_currency
+        )
+        return order, ipn
+
+    def _assert_first_payment_accepted(self, order_currency, mc_currency):
+        order, ipn = self._first_payment_ipn(order_currency, mc_currency)
+
+        paypal_payment = receive_ipn(ipn)
+
+        self.assertEqual(paypal_payment.order, order)
+        order.refresh_from_db()
+        self.assertEqual(order.status, Order.STATUS.COMPLETED)
+
+    def _assert_first_payment_refused(self, order_currency, mc_currency):
+        order, ipn = self._first_payment_ipn(order_currency, mc_currency)
+
+        with self.assertRaisesRegex(Exception, "Received currency doesn't match"):
+            receive_ipn(ipn)
+
+        order.refresh_from_db()
+        self.assertEqual(order.status, Order.STATUS.NEW)
+        self.assertFalse(PayPalPayment.objects.exists())
+        self.assertFalse(RecurringUserPlan.objects.exists())
+
+    def _renewal_payment_ipn(self, order_currency, mc_currency):
+        user, user_plan, order, pricing = self._make_renewal(
+            tax=None, amount=100, billing_info=False, currency=order_currency
+        )
+        return self._renewal_ipn(
+            user_plan, order, pricing, Decimal("100.00"), mc_currency
+        )
+
+    def _assert_renewal_accepted(self, order_currency, mc_currency):
+        ipn = self._renewal_payment_ipn(order_currency, mc_currency)
+
+        paypal_payment = receive_ipn(ipn)
+
+        self.assertEqual(Order.objects.count(), 2)
+        self.assertEqual(paypal_payment.order.status, Order.STATUS.COMPLETED)
+        return paypal_payment.order
+
+    def _assert_renewal_refused(self, order_currency, mc_currency):
+        ipn = self._renewal_payment_ipn(order_currency, mc_currency)
+
+        with self.assertRaisesRegex(Exception, "Received currency doesn't match"):
+            receive_ipn(ipn)
+
+        self.assertEqual(Order.objects.count(), 1)
+        self.assertFalse(PayPalPayment.objects.exists())
+
+    def test_receive_ipn_accepts_first_payment_in_the_order_currency(self):
+        self._assert_first_payment_accepted("EUR", "EUR")
+
+    def test_receive_ipn_rejects_first_payment_in_another_currency(self):
+        """
+        The subscribe button is a client-side form: a buyer can edit its
+        currency_code and pay a 100 USD order with 100 JPY. The postback
+        only proves PayPal sent the IPN, not what it charged.
+        """
+        self._assert_first_payment_refused("USD", "JPY")
+
+    def test_receive_ipn_accepts_renewal_in_the_order_currency(self):
+        self._assert_renewal_accepted("EUR", "EUR")
+
+    def test_receive_ipn_rejects_renewal_in_another_currency(self):
+        """A renewal would otherwise be invoiced as a new order in JPY."""
+        self._assert_renewal_refused("USD", "JPY")
+
+    def test_receive_ipn_rejects_usd_payment_for_a_non_usd_order(self):
+        """
+        Buttons before 1.7.0 charged USD whatever the order's currency, so
+        a subscription created then on a non-USD site keeps paying USD.
+        No legacy fallback: it is refused like any other currency.
+        """
+        self._assert_first_payment_refused("EUR", "USD")
+
+    def test_receive_ipn_rejects_usd_renewal_for_a_non_usd_order(self):
+        self._assert_renewal_refused("EUR", "USD")
+
+    def test_receive_ipn_first_payment_currency_ignores_case(self):
+        self._assert_first_payment_accepted("EUR", "eur")
+
+    def test_receive_ipn_renewal_currency_ignores_case(self):
+        self._assert_renewal_accepted("eur", "Eur")
+
+    def test_receive_ipn_renewal_is_invoiced_in_the_subscription_currency(self):
+        renewal = self._assert_renewal_accepted("EUR", "eur")
+
+        self.assertEqual(renewal.currency, "EUR")
+        self.assertEqual(RecurringUserPlan.objects.get().currency, "EUR")
+
+    def test_create_new_order_does_not_take_the_currency_from_the_ipn(self):
+        """create_new_order() is public: it may run without the IPN checks."""
+        user, user_plan, order, pricing = self._make_renewal(
+            tax=None, amount=100, billing_info=False, currency="USD"
+        )
+        ipn = self._renewal_ipn(
+            user_plan, order, pricing, Decimal("100.00"), mc_currency="JPY"
+        )
+
+        renewal = create_new_order(order, user_plan, ipn, get_custom_data(ipn))
+
+        self.assertEqual(renewal.currency, "USD")
+
+    def test_receive_ipn_accepts_zero_decimal_gross(self):
+        """PayPal reports 1210 JPY without decimals; the order total is 1210.00."""
+        user, user_plan, order, pricing = self._make_renewal(
+            tax=21, amount=1000, billing_info=False, currency="JPY"
+        )
+        ipn = self._renewal_ipn(
+            user_plan, order, pricing, Decimal("1210"), mc_currency="JPY"
+        )
+
+        renewal = receive_ipn(ipn).order
+
+        self.assertEqual(renewal.currency, "JPY")
+        self.assertEqual(renewal.total(), Decimal("1210"))
+        self.assertEqual(renewal.tax, Decimal("21"))
+
+    @override_settings(PLANS_TAXATION_POLICY=STUB_POLICY, PLANS_INVOICE_ISSUER=ISSUER)
+    def test_receive_ipn_renewal_tax_split_keeps_zero_decimal_gross(self):
+        """
+        The net is derived on django-plans' cent grid in every currency, so
+        a JPY renewal's net and tax can carry sen; the charged gross stays
+        exact (Order.validate_gross_amount() allows no whole-yen net here).
+        """
+        user, user_plan, order, pricing = self._make_renewal(
+            tax=21, amount=1000, currency="JPY"
+        )
+        ipn = self._renewal_ipn(
+            user_plan, order, pricing, Decimal("1210"), mc_currency="JPY"
+        )
+
+        renewal = receive_ipn(ipn).order
+
+        self.assertEqual(renewal.tax, StubTaxationPolicy.rate)
+        self.assertEqual(renewal.gross_amount, Decimal("1210"))
+        self.assertEqual(renewal.total(), Decimal("1210"))
+        self.assertEqual(renewal.amount + renewal.tax_total(), Decimal("1210"))
+
+    def test_receive_ipn_pending_payment_in_another_currency_completes_nothing(
+        self,
+    ):
+        """The attempt is recorded (its IPN shows JPY); the order is untouched."""
+        user_plan = baker.make("UserPlan")
+        order = baker.make("Order", user=user_plan.user, amount=100, currency="USD")
+        pricing = baker.make("Pricing")
+        ipn = self._renewal_ipn(
+            user_plan, order, pricing, Decimal("100.00"), mc_currency="JPY"
+        )
+        ipn.payment_status = ST_PP_PENDING
+
+        paypal_payment = receive_ipn(ipn)
+
+        self.assertEqual(paypal_payment.order, order)
+        order.refresh_from_db()
+        self.assertEqual(order.status, Order.STATUS.NEW)
+        self.assertFalse(RecurringUserPlan.objects.exists())
+
+    def test_receive_ipn_other_subscription_ipns_alter_no_order(self):
+        """
+        Only a completed subscr_payment completes or creates an order;
+        signup (amount3 + mc_currency), failure, end of term, modify and
+        refund adjustments (no txn_type) are ignored, whatever their currency.
+        """
+        for txn_type in (
+            "subscr_signup",
+            "subscr_failed",
+            "subscr_eot",
+            "subscr_modify",
+            "",
+        ):
+            with self.subTest(txn_type=txn_type):
+                order, ipn = self._first_payment_ipn("USD", "JPY")
+                ipn.txn_type = txn_type
+
+                self.assertIsNone(receive_ipn(ipn))
+
+                order.refresh_from_db()
+                self.assertEqual(order.status, Order.STATUS.NEW)
+                self.assertFalse(PayPalPayment.objects.exists())
+                self.assertFalse(RecurringUserPlan.objects.exists())
+
+    @patch("plans_paypal.hooks.logger")
+    def test_receive_ipn_unfinished_subscription_payment_alters_no_order(
+        self, mock_logger
+    ):
+        """Refunds and reversals are not handled: no order is touched."""
+        for payment_status in (
+            ST_PP_REFUNDED,
+            ST_PP_REVERSED,
+            ST_PP_DENIED,
+            ST_PP_FAILED,
+        ):
+            with self.subTest(payment_status=payment_status):
+                order, ipn = self._first_payment_ipn(
+                    "USD", "JPY", status=Order.STATUS.COMPLETED
+                )
+                ipn.payment_status = payment_status
+                orders = Order.objects.count()
+
+                self.assertIsNone(receive_ipn(ipn))
+
+                mock_logger.error.assert_called_with(
+                    "IPN with unknown status",
+                    extra={"ipn_obj": ipn, "ipn_status": payment_status},
+                )
+                self.assertEqual(Order.objects.count(), orders)
+                self.assertFalse(PayPalPayment.objects.exists())
+
     def test_receive_ipn_rejects_amount_matching_neither_expectation(self):
         user = baker.make("User", username="foobar")
         user_plan = baker.make("UserPlan", user=user)
@@ -634,7 +892,12 @@ class HooksTests(TestCase):
             tax=Decimal("21"),
         )
         order = baker.make(
-            "Order", user=user, status=Order.STATUS.COMPLETED, tax=19, amount=100
+            "Order",
+            user=user,
+            status=Order.STATUS.COMPLETED,
+            tax=19,
+            amount=100,
+            currency="USD",
         )
         pricing = baker.make("Pricing")
         ipn = self._renewal_ipn(user_plan, order, pricing, Decimal("999.00"))

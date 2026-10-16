@@ -5,17 +5,21 @@ from django.urls import reverse
 from model_bakery import baker
 from plans.models import Order
 
-from plans_paypal.views import PlansPayPalPaymentsForm
+from plans_paypal.views import (
+    PlansPayPalEncryptedPaymentsForm,
+    PlansPayPalPaymentsForm,
+)
 
 
 class PaymentFormViewTests(TestCase):
-    def _get_payment_page(self, days):
+    def _get_payment_page(self, days, **order_fields):
         user = baker.make("User")
         baker.make("UserPlan", user=user)
         pricing = baker.make("Pricing", period=days)
         plan_pricing = baker.make("PlanPricing", pricing=pricing, price=10)
+        order_fields.setdefault("amount", 10)
         order = baker.make(
-            Order, user=user, plan=plan_pricing.plan, pricing=pricing, amount=10
+            Order, user=user, plan=plan_pricing.plan, pricing=pricing, **order_fields
         )
         self.client.force_login(user)
         return self.client.get(reverse("paypal-payment", args=[order.id]))
@@ -31,6 +35,49 @@ class PaymentFormViewTests(TestCase):
         response = self._get_payment_page(days=365)
         form = response.context["form"]
         self.assertEqual(form.initial["t3"], "Y")
+
+    def test_button_charges_the_order_currency(self):
+        """
+        Without currency_code the button sent django-paypal's default USD,
+        whatever currency the order was invoiced in.
+        """
+        response = self._get_payment_page(days=30, currency="EUR")
+        self.assertEqual(response.context["form"]["currency_code"].value(), "EUR")
+
+    def test_button_upper_cases_the_order_currency(self):
+        response = self._get_payment_page(days=30, currency="czk")
+        self.assertEqual(response.context["form"]["currency_code"].value(), "CZK")
+
+    @override_settings(PAYPAL_ENCRYPTED_FORM=True)
+    @mock.patch.object(PlansPayPalEncryptedPaymentsForm, "_encrypt", return_value="")
+    def test_encrypted_button_charges_the_order_currency(self, _encrypt):
+        """
+        _encrypt() signs each field's initial value, the same value the
+        bound field reports (M2Crypto is not installed for the tests).
+        """
+        response = self._get_payment_page(days=30, currency="EUR")
+        form = response.context["form"]
+        self.assertIsInstance(form, PlansPayPalEncryptedPaymentsForm)
+        self.assertEqual(form["currency_code"].value(), "EUR")
+        _encrypt.assert_called_once_with()
+
+    def test_button_amount_keeps_cents_in_a_decimal_currency(self):
+        response = self._get_payment_page(days=30, currency="EUR", tax=21)
+        self.assertEqual(response.context["form"]["a3"].value(), "12.10")
+
+    def test_button_amount_has_no_decimals_in_a_zero_decimal_currency(self):
+        """PayPal rejects decimals for HUF, JPY and TWD, even ".00"."""
+        for currency in ("HUF", "JPY", "TWD", "jpy"):
+            with self.subTest(currency=currency):
+                response = self._get_payment_page(
+                    days=30, currency=currency, amount=1000, tax=21
+                )
+                self.assertEqual(response.context["form"]["a3"].value(), "1210")
+
+    def test_button_refuses_a_fraction_of_a_zero_decimal_currency(self):
+        """999 JPY + 21 % is 1208.79 JPY, which PayPal cannot charge."""
+        with self.assertRaisesRegex(ValueError, "1208.79 JPY"):
+            self._get_payment_page(days=30, currency="JPY", amount=999, tax=21)
 
     @override_settings(PAYPAL_TEST=True)
     def test_form_ignores_global_sandbox_setting(self):

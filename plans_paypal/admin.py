@@ -18,6 +18,7 @@ class PayPalPaymentAdmin(RelatedFieldAdmin):
         "order__amount",
         "paypal_ipn__mc_gross",
         "paypal_ipn__mc_fee",
+        "paypal_ipn__mc_currency",
         "created",
     )
     autocomplete_fields = (
