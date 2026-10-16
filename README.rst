@@ -105,6 +105,13 @@ Set following settings:
 
 Redirect user to `paypal-payment-sandbox` instead of `paypal-payment` view.
 
+Sandbox IPNs are accepted only with ``PAYPAL_TEST = True`` set explicitly
+(django-paypal's own default when it is unset does not count); otherwise
+they are refused with an exception and nothing is written. Live IPNs are
+processed either way, so one site can serve both buttons, but then a
+sandbox account can activate its paid plans: keep ``PAYPAL_TEST`` off
+production.
+
 Features
 --------
 
