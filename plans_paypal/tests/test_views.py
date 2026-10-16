@@ -136,6 +136,12 @@ class PaymentFormViewTests(TestCase):
 
 class PaymentFailureViewTests(TestCase):
     def test_payment_failure_view(self):
+        """
+        A GET changes nothing: any page can make a logged-in owner's
+        browser load this URL (an <img> pointing at it), and the failure
+        page asks the buyer to repeat the payment, which a canceled order
+        no longer allows.
+        """
         user = baker.make("User")
         order = baker.make(Order, user=user)
         self.client.force_login(user)
@@ -145,6 +151,8 @@ class PaymentFailureViewTests(TestCase):
             reverse("order_payment_failure", args=[order.id]),
             target_status_code=302,
         )
+        order.refresh_from_db()
+        self.assertEqual(order.status, Order.STATUS.NEW)
 
     def test_payment_failure_view_order_for_different_user(self):
         order = baker.make(Order, user=baker.make("User"))

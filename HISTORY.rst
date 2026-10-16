@@ -3,6 +3,17 @@
 History
 -------
 
+1.7.1 (unreleased)
+++++++++++++++++++
+
+* security: the ``paypal-payment-failure`` view (PayPal's
+  ``cancel_return``) no longer cancels the order. It did so on a GET,
+  so any page could cancel a logged-in user's unpaid order by making
+  their browser load the URL. The order stays NEW, payable again as the
+  failure page invites ("Please repeat payment process"), until it
+  expires. A payment that arrives later completes it instead of creating
+  a second order
+
 1.7.0 (2026-10-16)
 ++++++++++++++++++
 
