@@ -58,6 +58,17 @@ USD installations are not affected.
   the payment view instead of PayPal refusing the button
 * admin: the PayPal payment list shows the charged currency next to the
   gross and fee
+* security: a sandbox subscription IPN (``test_ipn=1``) is refused unless
+  ``PAYPAL_TEST = True`` is set:
+  ``Exception("Sandbox IPN refused: PAYPAL_TEST is not enabled")``,
+  nothing written. django-paypal verifies a sandbox IPN against PayPal's
+  sandbox on any deployment and the button's ``notify_url`` is editable,
+  so a live site that had ``PAYPAL_TEST_BUSSINESS_EMAIL`` set completed
+  orders and armed renewals paid with sandbox money. django-paypal's own
+  default (``PAYPAL_TEST`` is ``True`` when unset) does not count: a
+  sandbox setup relying on it has to set ``PAYPAL_TEST = True``, as the
+  README always said. Live IPNs are processed in either mode, unchanged.
+  IPNs other than subscription ones are still left to other receivers
 
 1.6.0 (2026-09-24)
 ++++++++++++++++++

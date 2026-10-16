@@ -938,7 +938,102 @@ class HooksTests(TestCase):
         user_plan.refresh_from_db()
         self.assertFalse(hasattr(user_plan, "recurring"))
 
+    def _sandbox_payment_ipn(self):
+        order, ipn = self._first_payment_ipn("USD", "USD")
+        ipn.test_ipn = True
+        ipn.receiver_email = "sandbox@email.com"
+        return order, ipn
+
     @override_settings(PAYPAL_TEST_BUSSINESS_EMAIL="sandbox@email.com")
+    def test_receive_ipn_refuses_sandbox_payment_on_a_live_site(self):
+        """
+        django-paypal verifies a test_ipn against PayPal's sandbox on any
+        deployment, and the button's notify_url is editable, so sandbox
+        money activated paid plans on a live site that had the test email
+        set. Unset PAYPAL_TEST is live: django-paypal's default (True when
+        unset) does not count.
+        """
+        for paypal_test in ({}, {"PAYPAL_TEST": False}):
+            label = paypal_test.get("PAYPAL_TEST", "unset")
+            with self.subTest(PAYPAL_TEST=label), self.settings(**paypal_test):
+                order, ipn = self._sandbox_payment_ipn()
+
+                with self.assertLogs("plans_paypal.hooks", "ERROR"):
+                    with self.assertRaisesRegex(Exception, "Sandbox IPN refused"):
+                        receive_ipn(ipn)
+
+                order.refresh_from_db()
+                self.assertEqual(order.status, Order.STATUS.NEW)
+                self.assertFalse(PayPalPayment.objects.exists())
+                self.assertFalse(RecurringUserPlan.objects.exists())
+
+    def test_receive_ipn_refuses_any_sandbox_subscription_ipn_on_a_live_site(self):
+        """A pending one would record a payment, a cancellation could end a plan."""
+        order, pending = self._sandbox_payment_ipn()
+        pending.payment_status = ST_PP_PENDING
+        recurring = baker.make(
+            "RecurringUserPlan", user_plan=order.user.userplan, token="I-1"
+        )
+        cancellation = baker.make(
+            "PayPalIPN",
+            txn_type="subscr_cancel",
+            test_ipn=True,
+            subscr_id="I-1",
+            custom="{" f"'first_order_id': {order.id}," "}",
+        )
+        for ipn in (pending, cancellation):
+            with self.subTest(txn_type=ipn.txn_type):
+                with self.assertLogs("plans_paypal.hooks", "ERROR"):
+                    with self.assertRaisesRegex(Exception, "Sandbox IPN refused"):
+                        receive_ipn(ipn)
+
+        self.assertFalse(PayPalPayment.objects.exists())
+        self.assertTrue(RecurringUserPlan.objects.filter(pk=recurring.pk).exists())
+
+    def test_receive_ipn_leaves_other_sandbox_ipns_to_other_receivers(self):
+        """Raising here would also keep the signal's other receivers from it."""
+        ipn = baker.make("PayPalIPN", test_ipn=True)
+
+        self.assertIsNone(receive_ipn(ipn))
+
+    @override_settings(
+        PAYPAL_TEST=True, PAYPAL_TEST_BUSSINESS_EMAIL="sandbox@email.com"
+    )
+    def test_receive_ipn_accepts_sandbox_payment_in_sandbox_mode(self):
+        order, ipn = self._sandbox_payment_ipn()
+
+        paypal_payment = receive_ipn(ipn)
+
+        self.assertEqual(paypal_payment.order, order)
+        order.refresh_from_db()
+        self.assertEqual(order.status, Order.STATUS.COMPLETED)
+        self.assertEqual(
+            RecurringUserPlan.objects.get().payment_provider,
+            "paypal-recurring-sandbox",
+        )
+
+    @override_settings(
+        PAYPAL_TEST=True, PAYPAL_TEST_BUSSINESS_EMAIL="sandbox@email.com"
+    )
+    def test_receive_ipn_accepts_live_payment_in_sandbox_mode(self):
+        """
+        PAYPAL_TEST lets sandbox IPNs in, it does not keep live ones out:
+        the live and the sandbox button can serve one site (since 0.2.1).
+        """
+        order, ipn = self._first_payment_ipn("USD", "USD")
+
+        paypal_payment = receive_ipn(ipn)
+
+        self.assertEqual(paypal_payment.order, order)
+        order.refresh_from_db()
+        self.assertEqual(order.status, Order.STATUS.COMPLETED)
+        self.assertEqual(
+            RecurringUserPlan.objects.get().payment_provider, "paypal-recurring"
+        )
+
+    @override_settings(
+        PAYPAL_TEST=True, PAYPAL_TEST_BUSSINESS_EMAIL="sandbox@email.com"
+    )
     def test_receive_ipn_sandbox_validates_against_test_business_email(self):
         """A test IPN must be checked against the sandbox business email."""
         user_plan = baker.make("UserPlan")

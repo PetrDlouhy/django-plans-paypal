@@ -156,6 +156,16 @@ def receive_ipn(sender, **kwargs):
         # Not a subscription
         return None
 
+    # django-paypal verifies a test_ipn against PayPal's sandbox on any
+    # deployment. Its own PAYPAL_TEST default (True) must not count here:
+    # a live site rarely sets PAYPAL_TEST at all.
+    if ipn_obj.test_ipn and not getattr(settings, "PAYPAL_TEST", False):
+        logger.error(
+            "Sandbox IPN refused: PAYPAL_TEST is not enabled",
+            extra={"ipn_obj": ipn_obj},
+        )
+        raise Exception("Sandbox IPN refused: PAYPAL_TEST is not enabled")
+
     order = Order.objects.get(pk=first_order_id)
     user_plan = order.user.userplan
 
