@@ -10,6 +10,7 @@ from plans import utils as plans_utils
 from plans.base.models import AbstractBillingInfo, AbstractRecurringUserPlan
 from plans.models import Order, Plan, Pricing
 
+from .currency import paypal_currency
 from .models import PayPalPayment
 
 logger = logging.getLogger(__name__)
@@ -229,6 +230,19 @@ def receive_ipn(sender, **kwargs):
                 },
             )
             raise Exception("Received amount doesn't match")
+        # The amount alone proves nothing: the button's currency_code is
+        # just as editable, so 9.90 JPY would pass for a 9.90 USD order.
+        expected_currency = paypal_currency(order)
+        if ipn_obj.mc_currency.upper() != expected_currency:
+            logger.error(
+                "Received currency doesn't match",
+                extra={
+                    "expected_currency": expected_currency,
+                    "ipn_currency": ipn_obj.mc_currency,
+                    "ipn_obj": ipn_obj,
+                },
+            )
+            raise Exception("Received currency doesn't match")
 
         # Undertake some action depending upon `ipn_obj`.
         if order.status != Order.STATUS.NEW:
