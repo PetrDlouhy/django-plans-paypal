@@ -2,6 +2,7 @@ import json
 import logging
 
 from django.conf import settings
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -35,8 +36,9 @@ class PlansPayPalEncryptedPaymentsForm(
     pass
 
 
+@login_required
 def view_that_asks_for_money(request, order_id, sandbox=False):
-    order = get_object_or_404(Order, pk=order_id)
+    order = get_object_or_404(Order, pk=order_id, user=request.user)
 
     period = order.pricing.period
     duration_unit = "D"

@@ -69,6 +69,12 @@ USD installations are not affected.
   sandbox setup relying on it has to set ``PAYPAL_TEST = True``, as the
   README always said. Live IPNs are processed in either mode, unchanged.
   IPNs other than subscription ones are still left to other receivers
+* security: the payment page (``paypal-payment`` and
+  ``paypal-payment-sandbox``) requires login and serves only the user's
+  own orders, someone else's order is a 404, like django-plans'
+  ``OrderView``. It looked the order up by id alone, so anyone, even
+  anonymous, could open it for any order id and read the owner's email
+  from the button's hidden ``custom`` field
 * Python 3.9 support dropped (end of life since October 2025):
   ``python_requires`` is ``>=3.10``. GitHub's ``ubuntu-latest`` runner
   moves to Ubuntu 26.04, which has no Python 3.9 build
