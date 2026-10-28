@@ -134,21 +134,8 @@ class HooksTests(TestCase):
         # A pending subscription payment (eCheck clearing) is in flight,
         # not declined: it must leave a visible record, arm nothing, and
         # complete nothing -- the follow-up COMPLETED IPN does that.
-        from paypal.standard.models import ST_PP_PENDING
-
-        from plans_paypal.models import PayPalPayment
-
-        user_plan = baker.make("UserPlan")
-        order = baker.make("Order", user=user_plan.user, amount=100)
-        ipn = baker.make(
-            "PayPalIPN",
-            txn_type="subscr_payment",
-            payment_status=ST_PP_PENDING,
-            custom="{"
-            f"'first_order_id': {order.id},"
-            f"'user_plan_id': {user_plan.id},"
-            "}",
-        )
+        order, ipn = self._pending_ipn()
+        user_plan = order.user.userplan
 
         paypal_payment = receive_ipn(ipn)
 
@@ -812,24 +799,42 @@ class HooksTests(TestCase):
         self.assertEqual(renewal.total(), Decimal("1210"))
         self.assertEqual(renewal.amount + renewal.tax_total(), Decimal("1210"))
 
-    def test_receive_ipn_pending_payment_in_another_currency_completes_nothing(
-        self,
-    ):
-        """The attempt is recorded (its IPN shows JPY); the order is untouched."""
+    def _pending_ipn(self, **ipn_fields):
         user_plan = baker.make("UserPlan")
         order = baker.make("Order", user=user_plan.user, amount=100, currency="USD")
         pricing = baker.make("Pricing")
-        ipn = self._renewal_ipn(
-            user_plan, order, pricing, Decimal("100.00"), mc_currency="JPY"
-        )
+        ipn = self._renewal_ipn(user_plan, order, pricing, Decimal("100.00"))
         ipn.payment_status = ST_PP_PENDING
+        for field, value in ipn_fields.items():
+            setattr(ipn, field, value)
+        return order, ipn
 
-        paypal_payment = receive_ipn(ipn)
+    def test_receive_ipn_refuses_pending_payment_not_asked_for(self):
+        """
+        A pending payment is recorded as a payment in flight for the
+        order, which support reads as "the customer is paying". The
+        button is editable, so the same checks as for a completed payment
+        apply: another receiver, amount or currency is refused.
+        """
+        cases = {
+            "receiver": (
+                {"receiver_email": "attacker@email.com"},
+                "Returned email doesn't match",
+            ),
+            "amount": ({"mc_gross": Decimal("1.00")}, "Received amount doesn't match"),
+            "currency": ({"mc_currency": "JPY"}, "Received currency doesn't match"),
+        }
+        for case, (ipn_fields, message) in cases.items():
+            with self.subTest(case):
+                order, ipn = self._pending_ipn(**ipn_fields)
 
-        self.assertEqual(paypal_payment.order, order)
-        order.refresh_from_db()
-        self.assertEqual(order.status, Order.STATUS.NEW)
-        self.assertFalse(RecurringUserPlan.objects.exists())
+                with self.assertRaisesRegex(Exception, message):
+                    receive_ipn(ipn)
+
+                order.refresh_from_db()
+                self.assertEqual(order.status, Order.STATUS.NEW)
+                self.assertFalse(PayPalPayment.objects.exists())
+                self.assertFalse(RecurringUserPlan.objects.exists())
 
     def test_receive_ipn_other_subscription_ipns_alter_no_order(self):
         """
