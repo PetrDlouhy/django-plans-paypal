@@ -388,6 +388,7 @@ class HooksTests(TestCase):
         user = baker.make("User", username="foobar")
         user_plan = baker.make("UserPlan", user=user)
         baker.make("RecurringUserPlan", user_plan=user_plan)
+        pricing = baker.make("Pricing")
         order = baker.make(
             "Order",
             user=user,
@@ -395,10 +396,10 @@ class HooksTests(TestCase):
             tax=tax,
             amount=amount,
             currency=currency,
+            pricing=pricing,
         )
         if billing_info:
             baker.make("BillingInfo", user=user, country=country)
-        pricing = baker.make("Pricing")
         return user, user_plan, order, pricing
 
     @override_settings(PLANS_TAXATION_POLICY=STUB_POLICY, PLANS_INVOICE_ISSUER=ISSUER)
@@ -516,14 +517,10 @@ class HooksTests(TestCase):
         self.assertEqual(new_order.amount, Decimal("11.18"))
 
     @override_settings(PLANS_INVOICE_ISSUER=ISSUER)
-    @patch("plans_paypal.hooks.logger")
-    def test_receive_ipn_renewal_empty_custom_falls_back_to_item_number(
-        self, mock_logger
-    ):
+    def test_receive_ipn_renewal_empty_custom_falls_back_to_item_number(self):
         """
         PayPal sometimes sends an empty `custom` field. The order is then
-        found via item_number and plan/pricing fall back to the user's
-        current plan and the first order's pricing.
+        found via item_number and renewed into its plan and pricing.
         """
         user, user_plan, order, pricing = self._make_renewal(
             tax=12, amount=100, billing_info=False
@@ -542,10 +539,38 @@ class HooksTests(TestCase):
 
         new_order = paypal_payment.order
         self.assertNotEqual(new_order, order)
-        self.assertEqual(new_order.plan, user_plan.plan)
+        self.assertEqual(new_order.plan, order.plan)
         self.assertEqual(new_order.pricing, order.pricing)
         self.assertEqual(new_order.tax, Decimal("12"))
-        mock_logger.exception.assert_called_once()
+
+    @override_settings(PLANS_INVOICE_ISSUER=ISSUER)
+    def test_receive_ipn_renewal_ignores_plan_and_pricing_in_custom(self):
+        """
+        `custom` is a field of the subscribe button, which the buyer can
+        edit: subscribing at the cheap order's price with the expensive
+        plan's ids in it must not renew into the expensive plan.
+        """
+        user, user_plan, order, pricing = self._make_renewal(
+            tax=None, amount=100, billing_info=False
+        )
+        expensive_plan = baker.make("Plan")
+        expensive_pricing = baker.make("Pricing", period=365)
+        ipn = self._renewal_ipn(user_plan, order, pricing, Decimal("100.00"))
+        ipn.custom = (
+            "{"
+            f"'first_order_id': {order.id},"
+            f"'plan_id': {expensive_plan.id},"
+            f"'pricing_id': {expensive_pricing.id},"
+            "}"
+        )
+
+        renewal = receive_ipn(ipn).order
+
+        self.assertNotEqual(renewal, order)
+        self.assertEqual(renewal.plan, order.plan)
+        self.assertEqual(renewal.pricing, order.pricing)
+        user_plan.refresh_from_db()
+        self.assertEqual(user_plan.plan, order.plan)
 
     @override_settings(PLANS_INVOICE_ISSUER=ISSUER)
     def test_receive_ipn_accepts_amount_matching_recurring_plan(self):
@@ -628,7 +653,7 @@ class HooksTests(TestCase):
         user_plan = user_plan.__class__.objects.get(pk=user_plan.pk)
         ipn = self._renewal_ipn(user_plan, order, pricing, Decimal("119.00"))
 
-        new_order = create_new_order(order, user_plan, ipn, get_custom_data(ipn))
+        new_order = create_new_order(order, user_plan, ipn)
 
         self.assertEqual(new_order.tax, Decimal("19"))
         self.assertEqual(new_order.amount, Decimal("100"))
@@ -647,7 +672,7 @@ class HooksTests(TestCase):
         ipn = self._renewal_ipn(user_plan, order, pricing, Decimal("150.00"))
 
         with self.assertRaises(ValidationError):
-            create_new_order(order, user_plan, ipn, get_custom_data(ipn))
+            create_new_order(order, user_plan, ipn)
 
         self.assertEqual(Order.objects.count(), 1)
 
@@ -759,7 +784,7 @@ class HooksTests(TestCase):
             user_plan, order, pricing, Decimal("100.00"), mc_currency="JPY"
         )
 
-        renewal = create_new_order(order, user_plan, ipn, get_custom_data(ipn))
+        renewal = create_new_order(order, user_plan, ipn)
 
         self.assertEqual(renewal.currency, "USD")
 
