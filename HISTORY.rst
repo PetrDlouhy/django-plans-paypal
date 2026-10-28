@@ -22,6 +22,15 @@ History
 * a renewal whose ``custom`` lacks ``plan_id`` no longer falls back to
   the user's current plan, which could differ from the plan the
   subscription pays for
+* security: a ``subscr_payment`` (completed or pending) is checked
+  against the ``RecurringUserPlan`` expectation (the amount updated
+  after a PayPal-side change, 1.5.0) only when the IPN's ``subscr_id``
+  is the expectation's token, i.e. the subscription that armed it. Any
+  armed expectation counted, whichever subscription or card had armed
+  it: a buyer with a cheap monthly subscription could edit a yearly
+  order's button to the monthly price, and the new subscription's first
+  payment completed the yearly order. A renewal's tax split falls back
+  to such an expectation under the same condition
 
 1.7.0 (2026-10-16)
 ++++++++++++++++++
