@@ -1,4 +1,5 @@
 import ast
+import json
 import logging
 from decimal import Decimal
 
@@ -17,16 +18,25 @@ logger = logging.getLogger(__name__)
 
 
 def parse_custom(custom):
-    custom = custom.replace("null", "None")
-    return ast.literal_eval(custom)
+    """The subscribe button's ``custom`` field.
+
+    Buttons write JSON, except 0.4.5's, which wrote the Python repr of a
+    dict; renewals of those subscriptions still carry it.
+    ``ast.literal_eval`` evaluates no code, and within the field's 256
+    characters it raises only ValueError, TypeError or SyntaxError.
+    """
+    try:
+        return json.loads(custom)
+    except json.JSONDecodeError:
+        return ast.literal_eval(custom)
 
 
 def get_custom_data(ipn_obj):
     if not ipn_obj.custom or not ipn_obj.custom.strip():
         return {"first_order_id": ipn_obj.item_number}
     try:
-        return parse_custom(ipn_obj.custom)
-    except (SyntaxError, ValueError):
+        custom_data = parse_custom(ipn_obj.custom)
+    except (SyntaxError, TypeError, ValueError):
         logger.exception(
             "Can't parse custom data",
             extra={
@@ -35,6 +45,16 @@ def get_custom_data(ipn_obj):
             },
         )
         return {"first_order_id": ipn_obj.item_number}
+    if not isinstance(custom_data, dict) or "first_order_id" not in custom_data:
+        logger.error(
+            "Custom data has no first_order_id",
+            extra={
+                "custom_data": ipn_obj.custom,
+                "ipn_obj": ipn_obj,
+            },
+        )
+        return {"first_order_id": ipn_obj.item_number}
+    return custom_data
 
 
 def get_renewal_tax_and_amount(user, gross):
