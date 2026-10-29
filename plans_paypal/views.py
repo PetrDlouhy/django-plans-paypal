@@ -133,8 +133,7 @@ class PaymentFailureView(LoginRequiredMixin, View):
                 order.pk,
             )
             return redirect(reverse("order_payment_success", kwargs={"pk": order_id}))
-        order.status = Order.STATUS.CANCELED
-        # In case django-simple-history is installed
-        order._change_reason = "Django-payments-paypal: Payment failed by cancel view"
-        order.save()
+        # The order stays NEW: a GET must not change state (any page can make
+        # the owner's browser load this URL), and the failure page asks the
+        # buyer to repeat the payment, which a canceled order no longer allows.
         return redirect(reverse("order_payment_failure", kwargs={"pk": order_id}))
