@@ -3,8 +3,13 @@
 History
 -------
 
-1.7.1 (unreleased)
+1.8.0 (2026-10-29)
 ++++++++++++++++++
+
+**Upgrade note:** an abandoned PayPal checkout no longer turns its order
+into CANCELED; the order stays NEW until it expires (see the
+``paypal-payment-failure`` entry below). Code that calls
+``create_new_order()`` must drop its ``custom_ipn_data`` argument.
 
 * security: a pending ``subscr_payment`` (an eCheck clearing, recorded
   since 1.3.0) passes the same checks as a completed one before it is
@@ -47,6 +52,8 @@ History
   failure page invites ("Please repeat payment process"), until it
   expires. A payment that arrives later completes it instead of creating
   a second order
+* requires django-plans >= 2.8.2 and django-author >= 1.2.0
+* tested on Python 3.15 (Django 6.1)
 
 1.7.0 (2026-10-16)
 ++++++++++++++++++
